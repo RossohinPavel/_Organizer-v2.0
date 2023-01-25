@@ -44,6 +44,7 @@ class ChildWindow(tk.Toplevel):
         self.geometry(f"+{place_x}+{place_y}")
 
     def focus(self):
+        """Перехват фокуса и блокирование родительского окна"""
         self.grab_set()
         self.focus_set()
         self.wait_window()
@@ -63,7 +64,7 @@ class RoddomWindow(ChildWindow):
         self.directory_info = tk.StringVar(self, value=SETTINGS['roddom_dir'])
         self.order_calc_info = None
         self.text_res_enable = tk.IntVar(self, value=1)
-        self.mrk_form_enable = tk.IntVar(self, value=1)
+        self.mrk_form_enable = tk.IntVar(self, value=0)
         # Вызов отрисовки основных виджетов
         self.show_directory_widget()
         self.info_frame = tk.Frame(self, width=260, height=80)
@@ -74,15 +75,19 @@ class RoddomWindow(ChildWindow):
         self.focus()
 
     def show_directory_widget(self):
-        dir_status_label = tk.Label(self, text='Папка, куда сохраняются заказы Роддом\'а',)
-        dir_status_label.pack()
-        dir_update_button = tk.Button(self, textvariable=self.directory_info, command=self.update_directory,
-                                      width=250, **self.style)
-        dir_update_button.pack(padx=3)
-        separator = tk.Canvas(self, width=260, height=1, bg='black')
-        separator.pack()
+        """Функция отрисовки фрейма с информацией, где храняться заказы роддома"""
+        frame = tk.Frame(self, width=260, height=50)
+        dir_status_label = tk.Label(frame, text='Папка, куда сохраняются заказы Роддом\'а')
+        dir_status_label.place(x=0, y=0)
+        dir_update_button = tk.Button(frame, textvariable=self.directory_info, command=self.update_directory,
+                                      width=35, **self.style)
+        dir_update_button.place(x=3, y=20)
+        separator = tk.Canvas(frame, width=260, height=1, bg='black')
+        separator.place()
+        frame.pack()
 
     def update_directory(self):
+        """Функция смены папки размещения заказов роддома"""
         new_path = tkfd.askdirectory()
         if new_path:
             self.directory_info.set(new_path)
@@ -90,6 +95,7 @@ class RoddomWindow(ChildWindow):
             Conf.write_json_config('settings', SETTINGS)
 
     def show_cb_frame(self):
+        """Функция отрисовки Checkbutton - настроек обработки заказов роддома"""
         frame = tk.Frame(self, width=260, height=50)
         separator = tk.Canvas(frame, width=260, height=1, bg='black')
         separator.place(x=0, y=0)
@@ -100,6 +106,7 @@ class RoddomWindow(ChildWindow):
         frame.pack()
 
     def show_buttons_widget(self):
+        """Функция отрисовки кнопок, для взаимодействия с заказом"""
         frame = tk.Frame(self, width=260, height=60)
         button1 = tk.Button(frame, text='Посчитать заказ', command=self.init_calc, **self.style)
         button1.place(x=3, y=0)
@@ -110,6 +117,7 @@ class RoddomWindow(ChildWindow):
         frame.pack()
 
     def init_calc(self):
+        """Функция вызова метода подсчета из заказа - объекта Роддома"""
         order = tkfd.askdirectory(initialdir=self.directory_info.get())
         if not order:
             return
@@ -119,43 +127,46 @@ class RoddomWindow(ChildWindow):
         self.info_to_clipboard()
 
     def info_to_clipboard(self):
-        if self.order_exist:
-            tk.Tk.clipboard_clear(self)
-            tk.Tk.clipboard_append(self, self.order_calc_info)
+        """Функция, которая заносит информацию о пути и дате заказа в будфер обмена"""
+        tk.Tk.clipboard_clear(self)
+        tk.Tk.clipboard_append(self, self.order_calc_info)
 
     def info_frame_clear(self):
+        """Функция очистки info_frame"""
         for widget in self.info_frame.winfo_children():
             widget.destroy()
 
     def show_order_info(self, text):
+        """Функция отрисовки подсчитанной информации"""
         self.info_frame_clear()
         label = tk.Label(self.info_frame, text=text, font=12)
         label.place(x=0, y=0)
 
     def button_disabler(self):
+        """Функция, которая выключает взаимодействие с кнопками"""
         for i in self.winfo_children():
-            if type(i) == tk.Button:
-                i.config(state="disabled")
-            if type(i) ==tk.Frame:
+            if type(i) == tk.Frame:
                 for j in i.winfo_children():
-                    if type(j) == tk.Button:
+                    if type(j) == tk.Button and j._name != '!button2':
                         j.config(state="disabled")
 
     def button_enabler(self):
+        """Функция, которая включает взаимодействие с кнопками"""
         for i in self.winfo_children():
-            if type(i) == tk.Button:
-                i.config(state="normal")
-            if type(i) ==tk.Frame:
+            if type(i) == tk.Frame:
                 for j in i.winfo_children():
-                    if type(j) == tk.Button:
+                    if type(j) == tk.Button and j._name != '!button2':
                         j.config(state="normal")
 
     def to_print(self):
+        """Функция отправки в печать. Отображает на экране информацию о коопировани и вызывает методы копирования"""
         if not self.order_exist:
             return
         path = tkfd.askdirectory(initialdir=SETTINGS['fotoprint_disc'])
         if not path:
             return
+        self.order_calc_info = f'{path}\n\nРоддом\n\n{self.order_exist.order_name}'
+        self.info_to_clipboard()
         self.info_frame_clear()
         self.button_disabler()
         operation_label = tk.Label(self.info_frame, text='Создаю Каталоги')
