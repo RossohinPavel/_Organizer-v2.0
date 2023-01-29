@@ -54,6 +54,8 @@ class RoddomWindow(ChildWindow):
     """Окно Роддома"""
     def __init__(self, parent_root):
         super().__init__(parent_root)
+        # Получаем настройки из конфигов
+        self.settings = Conf.read_pcl('settings')
         # Основные настройки окна
         self.title('Роддом')
         self.geometry('260x270')
@@ -61,7 +63,7 @@ class RoddomWindow(ChildWindow):
         self.to_parent_center()
         # Переменные, которые используют виджеты
         self.order_exist = None
-        self.directory_info = tk.StringVar(self, value=SETTINGS['roddom_dir'])
+        self.directory_info = tk.StringVar(self, self.settings['roddom_main_dir'])
         self.order_calc_info = None
         self.text_res_enable = tk.IntVar(self, value=1)
         self.mrk_form_enable = tk.IntVar(self, value=0)
@@ -91,8 +93,8 @@ class RoddomWindow(ChildWindow):
         new_path = tkfd.askdirectory()
         if new_path:
             self.directory_info.set(new_path)
-            SETTINGS['roddom_dir'] = new_path
-            Conf.write_json_config('settings', SETTINGS)
+            self.settings['roddom_main_dir'] = new_path
+            Conf.write_pcl('settings', self.settings)
 
     def show_cb_frame(self):
         """Функция отрисовки Checkbutton - настроек обработки заказов роддома"""
@@ -162,7 +164,7 @@ class RoddomWindow(ChildWindow):
         """Функция отправки в печать. Отображает на экране информацию о коопировани и вызывает методы копирования"""
         if not self.order_exist:
             return
-        path = tkfd.askdirectory(initialdir=SETTINGS['fotoprint_disc'])
+        path = tkfd.askdirectory(initialdir=self.settings['fotoprint_temp_dir'])
         if not path:
             return
         self.order_calc_info = f'{path}\n\nРоддом\n\n{self.order_exist.order_name}'
@@ -216,5 +218,4 @@ if __name__ == '__main__':
     root.title('Органайзер 2.0 BETA')
     set_main_graph_settings()
     init_cells()
-    SETTINGS = Conf.read_json_config('settings')
     root.mainloop()
