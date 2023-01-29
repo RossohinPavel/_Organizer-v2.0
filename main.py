@@ -1,6 +1,7 @@
 """Органайзер. Версия 2_0"""
 import tkinter as tk
 from tkinter import filedialog as tkfd
+from tkinter import colorchooser as tkcc
 from tkinter.ttk import Progressbar
 import Modules.Configs as Conf
 import Modules.Roddom as Roddom
@@ -195,14 +196,134 @@ class RoddomWindow(ChildWindow):
         self.order_exist = None
 
 
-def init_roddom_window(): RoddomWindow(root)
+class SettingsWindow(ChildWindow):
+    def __init__(self, main_window):
+        super().__init__(main_window)
+        self.settings = Conf.read_pcl('settings')
+        self.title('Настройки')
+        self.show_autolog_widget()
+        self.show_log_check_depth_widget()
+        self.show_cover_processing_settings('Цвет обводки', 'stroke_color', 'Толщина обводки', 'stroke_size')
+        self.show_cover_processing_settings('Цвет направляющих', 'guideline_color', 'Толщина направляющих', 'guideline_size')
+        self.show_directory_widget('Диск оператора фотопечати', 'fotoprint_temp_dir')
+        self.show_directory_widget('Папка для сохранения заказов', 'order_main_dir')
+
+    def show_autolog_widget(self):
+        def update_label_info():
+            autolog_label.config(text='Автолог: Активен' if self.settings['autolog'] else 'Автолог: Отключен')
+            autolog_init_bt.config(text='Отключить' if self.settings['autolog'] else 'Включить')
+
+        def init_autolog():
+            value = not self.settings['autolog']
+            self.settings['autolog'] = value
+            update_label_info()
+            Conf.write_pcl('settings', self.settings)
+
+        frame = tk.Frame(self, width=260, height=30)
+        autolog_label = tk.Label(frame)
+        autolog_label.place(x=0, y=4)
+        autolog_init_bt = tk.Button(frame, **self.style, command=init_autolog)
+        autolog_init_bt.place(x=130, y=2)
+        update_label_info()
+        separator = tk.Canvas(frame, width=260, height=1, bg='black')
+        separator.place(x=0, y=27)
+        frame.pack()
+
+    def show_log_check_depth_widget(self):
+        def update_text_value():
+            label.config(text=f'Глубина проверки лога - {self.settings["log_check_depth"]} заказов')
+
+        def update_depth_value():
+            value = entry_var.get()
+            if value.isdigit():
+                self.settings['log_check_depth'] = int(value)
+                Conf.write_pcl('settings', self.settings)
+            update_text_value()
+            entry.delete(0, tk.END)
+
+        frame = tk.Frame(self, width=260, height=51)
+        label = tk.Label(frame)
+        label.place(x=1, y=1)
+        update_text_value()
+        entry_var = tk.StringVar(frame)
+        entry = tk.Entry(frame, width=10, textvariable=entry_var)
+        entry.place(x=40, y=26)
+        update_button = tk.Button(frame, text='Задать', **self.style, command=update_depth_value)
+        update_button.place(x=120, y=22)
+        separator = tk.Canvas(frame, width=260, height=1, bg='black')
+        separator.place(x=0, y=47)
+        frame.pack()
+
+    def show_cover_processing_settings(self, color_text, color_stg_key, size_text, size_stg_key):
+        def update_color():
+            color = tkcc.askcolor()
+            if color:
+                self.settings[color_stg_key] = color[1]
+                Conf.write_pcl('settings', self.settings)
+            color_btn.config(bg=self.settings[color_stg_key])
+
+        def update_size_label():
+            size_label.config(text=f'{size_text}: {self.settings[size_stg_key]} пикселей')
+
+        def update_size(val):
+            self.settings[size_stg_key] = int(val)
+            Conf.write_pcl('settings', self.settings)
+            update_size_label()
+
+        frame = tk.Frame(self, width=260, height=73)
+        label = tk.Label(frame, text=color_text)
+        label.place(x=1, y=3)
+        color_btn = tk.Button(frame, relief=tk.FLAT, width=12, bg=self.settings[color_stg_key], command=update_color)
+        color_btn.place(x=125, y=0)
+
+        size_label = tk.Label(frame)
+        size_label.place(x=1, y=26)
+        scale = tk.Scale(frame, orient=tk.HORIZONTAL, from_=1, to=10, length=250, showvalue=False, command=update_size)
+        scale.place(x=0, y=48)
+        scale.set(self.settings[size_stg_key])
+        update_size_label()
+
+        separator = tk.Canvas(frame, width=260, height=1, bg='black')
+        separator.place(x=0, y=68)
+        frame.pack()
+
+    def show_directory_widget(self, text, settings_key):
+        def update_directory():
+            path = tkfd.askdirectory()
+            if path:
+                text_var.set(path)
+                self.settings[settings_key] = path
+                Conf.write_pcl('settings', self.settings)
+
+        frame = tk.Frame(self, width=260, height=50)
+        text_var = tk.StringVar(frame, value=self.settings[settings_key])
+        dir_status_label = tk.Label(frame, text=text)
+        dir_status_label.place(x=0, y=0)
+        dir_update_button = tk.Button(frame, textvariable=text_var, command=update_directory, width=35, **self.style)
+        dir_update_button.place(x=3, y=20)
+        separator = tk.Canvas(frame, width=260, height=1, bg='black')
+        separator.place(x=0, y=45)
+        frame.pack()
 
 
 def init_cells():
+    def init_roddom_window(): RoddomWindow(root)
+
     fotoprint_label = CellLabel(master=root, label_color='pale green1', label_text='Фотопечать')
     fotoprint_label.pack()
     roddom_cell = CellOneButton(master=root, func_name='Роддом', func=init_roddom_window, pd_x=50)
     roddom_cell.pack()
+
+
+def show_menus():
+    def init_window(): SettingsWindow(root)
+
+    settings_menu = tk.Menu(tearoff=0)
+    settings_menu.add_command(label="Общие настройки", command=init_window)
+
+    main_menu = tk.Menu()
+    main_menu.add_cascade(label="Настройки", menu=settings_menu)
+    root.config(menu=main_menu)
 
 
 def set_main_graph_settings():
@@ -217,5 +338,6 @@ if __name__ == '__main__':
     root = tk.Tk()
     root.title('Органайзер 2.0 BETA')
     set_main_graph_settings()
+    show_menus()
     init_cells()
     root.mainloop()
