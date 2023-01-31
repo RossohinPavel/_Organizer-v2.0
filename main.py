@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import filedialog as tkfd
 from tkinter import colorchooser as tkcc
 from tkinter.ttk import Progressbar
+from tkinter.ttk import Combobox
 import Modules.Configs as Conf
 import Modules.Roddom as Roddom
 import Modules.FileProcessor as FileProc
@@ -26,6 +27,7 @@ class CellOneButton(tk.Frame):
 
 
 class ChildWindow(tk.Toplevel):
+    """Конструктор для дочерних окон"""
     def __init__(self, parent_root):
         self.parent_root = parent_root
         super().__init__(master=parent_root)
@@ -207,6 +209,8 @@ class SettingsWindow(ChildWindow):
         self.show_cover_processing_settings('Цвет направляющих', 'guideline_color', 'Толщина направляющих', 'guideline_size')
         self.show_directory_widget('Диск оператора фотопечати', 'fotoprint_temp_dir')
         self.show_directory_widget('Папка для сохранения заказов', 'order_main_dir')
+        self.to_parent_center()
+        self.focus()
 
     def show_autolog_widget(self):
         def update_label_info():
@@ -306,6 +310,30 @@ class SettingsWindow(ChildWindow):
         frame.pack()
 
 
+class LibraryWindow(ChildWindow):
+    def __init__(self, parent_root):
+        super().__init__(parent_root)
+        self.library = Conf.read_pcl('library')
+
+    def get_book_category(self):
+        return list(self.library)
+
+
+class AddToLibWindow(LibraryWindow):
+    def __init__(self, parent_root):
+        super().__init__(parent_root)
+        self.title('Добавить продукт в Библиотеку')
+        self.show_category_frame()
+
+    def show_category_frame(self):
+        frame = tk.Frame(self, width=500, height=50, bg='red')
+        label = tk.Label(frame, text='Выберите категорию')
+        label.place(x=200, y=1)
+        combobox = Combobox(frame, state="readonly", width=40, values=self.get_book_category())
+        combobox.place(x=130, y=25)
+        frame.pack()
+
+
 def init_cells():
     def init_roddom_window(): RoddomWindow(root)
 
@@ -316,13 +344,20 @@ def init_cells():
 
 
 def show_menus():
-    def init_window(): SettingsWindow(root)
+    def init_settings_window(): SettingsWindow(root)
+    def init_add_to_lib_window(): AddToLibWindow(root)
 
     settings_menu = tk.Menu(tearoff=0)
-    settings_menu.add_command(label="Общие настройки", command=init_window)
+    settings_menu.add_command(label="Общие настройки", command=init_settings_window)
+
+    library_menu = tk.Menu(tearoff=0)
+    library_menu.add_command(label='Добавить продукт', command=init_add_to_lib_window)
+    library_menu.add_command(label='Изменить продукт')
+    library_menu.add_command(label='Удалить продукт')
 
     main_menu = tk.Menu()
     main_menu.add_cascade(label="Настройки", menu=settings_menu)
+    main_menu.add_cascade(label='Библиотека', menu=library_menu)
     root.config(menu=main_menu)
 
 

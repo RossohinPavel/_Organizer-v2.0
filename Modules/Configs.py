@@ -20,3 +20,8 @@ def write_pcl(name, value):
 def read_pcl(name):
     with open(f'Configs/{name}.pcl', 'rb') as file:
         return pickle.load(file)
+
+
+def read_pcl_for_test(name):
+    with open(f'../Configs/{name}.pcl', 'rb') as file:
+        return pickle.load(file)
