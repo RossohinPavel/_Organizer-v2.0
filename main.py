@@ -7,10 +7,12 @@ from tkinter.ttk import Combobox
 import Modules.Configs as Conf
 import Modules.Roddom as Roddom
 import Modules.FileProcessor as FileProc
+import Modules.Library as Lib
 
 
 class CellLabel(tk.Frame):
     """Конструктор для ячеек с названиями"""
+
     def __init__(self, label_color='red', label_text='Название лейбла', *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.label = tk.Label(self, text=label_text, bg=label_color, width=270)
@@ -19,6 +21,7 @@ class CellLabel(tk.Frame):
 
 class CellOneButton(tk.Frame):
     """Конструктор для одиночных кнопок"""
+
     def __init__(self, func_name='Название кнопки', func=None, pd_x=0, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.config(width=270)
@@ -28,6 +31,7 @@ class CellOneButton(tk.Frame):
 
 class ChildWindow(tk.Toplevel):
     """Конструктор для дочерних окон"""
+
     def __init__(self, parent_root):
         self.parent_root = parent_root
         super().__init__(master=parent_root)
@@ -55,13 +59,14 @@ class ChildWindow(tk.Toplevel):
 
 class RoddomWindow(ChildWindow):
     """Окно Роддома"""
+
     def __init__(self, parent_root):
         super().__init__(parent_root)
         # Получаем настройки из конфигов
         self.settings = Conf.read_pcl('settings')
         # Основные настройки окна
         self.title('Роддом')
-        self.geometry('260x270')
+        self.geometry('260x237')
         self.resizable(False, False)
         self.to_parent_center()
         # Переменные, которые используют виджеты
@@ -206,7 +211,8 @@ class SettingsWindow(ChildWindow):
         self.show_autolog_widget()
         self.show_log_check_depth_widget()
         self.show_cover_processing_settings('Цвет обводки', 'stroke_color', 'Толщина обводки', 'stroke_size')
-        self.show_cover_processing_settings('Цвет направляющих', 'guideline_color', 'Толщина направляющих', 'guideline_size')
+        self.show_cover_processing_settings('Цвет направляющих', 'guideline_color', 'Толщина направляющих',
+                                            'guideline_size')
         self.show_directory_widget('Диск оператора фотопечати', 'fotoprint_temp_dir')
         self.show_directory_widget('Папка для сохранения заказов', 'order_main_dir')
         self.to_parent_center()
@@ -282,7 +288,7 @@ class SettingsWindow(ChildWindow):
 
         size_label = tk.Label(frame)
         size_label.place(x=1, y=26)
-        scale = tk.Scale(frame, orient=tk.HORIZONTAL, from_=1, to=10, length=250, showvalue=False, command=update_size)
+        scale = tk.Scale(frame, orient=tk.HORIZONTAL, from_=1, to=10, length=255, showvalue=False, command=update_size)
         scale.place(x=0, y=48)
         scale.set(self.settings[size_stg_key])
         update_size_label()
@@ -311,27 +317,233 @@ class SettingsWindow(ChildWindow):
 
 
 class LibraryWindow(ChildWindow):
+    """Конструктор для окон библиотеки"""
+
     def __init__(self, parent_root):
         super().__init__(parent_root)
-        self.library = Conf.read_pcl('library')
+        # Переменные, которые заполняются в зависимости от выбранного окна и выбранного действия
+        self.category_combobox = None  # Для отрисовки комбобокса категорий и сохранения его значений
+        self.product_menus_frame = None  # Фрейм, на котором рисуются менюшки с выбором
+        self.product_description = None  # Для хранения словаря с описанием категорий продукта и типов значений
+        self.full_name_variable = None  # Текстовая переменная для Entry полного имени продукта
+        self.short_name_cb = None  # Комбобокс с выбором короткого имени
+        self.book_format_cb = None  # Комбобокс с выбором формата
+        self.book_option_cb = None  # Комбобокс с выбором опций сборки
+        self.book_lamination_cb = None  # Комбобокс для ламинации
+        self.cover_print_mat_cb = None  # Комбобокс с печатным материалом обложки
+        self.page_print_mat_cb = None  # Кобобокс с печатным материалом разворотов
+        self.is_tablet_chb_var = None       # Переменная CheckButton проверка на планшет
+        self.gl_value_var = None        # Переменная для Entry значения направяющих
+        self.gl_length_var = None       # Переменная для Entry длинны направляющих
+        self.cover_canal_cb = None      # Комбобокс с выбором канала обложки
+        self.dc_overlap_var = None      # Переменная для Entry значения нахлеста для раскодировки
+        self.dc_top_indent_var = None   # Переменная для Entry значения отступа сверху
+        self.dc_left_indent_var = None  # Переменная для Entry значения отступа слева
 
-    def get_book_category(self):
-        return list(self.library)
+    def show_category_frame(self, cb_bind_func):
+        """Функция для обображения фрейма категорий. Инициализирует комбобокс с нужным Событием."""
+        frame = tk.Frame(self, width=500, height=51)
+        label = tk.Label(frame, text='Выберите категорию')
+        label.place(x=200, y=1)
+        self.category_combobox = Combobox(frame, state="readonly", width=40, values=Lib.ProductFactory.product_type())
+        self.category_combobox.bind('<<ComboboxSelected>>', cb_bind_func)
+        self.category_combobox.place(x=130, y=25)
+        separator = tk.Canvas(frame,  width=496, height=1, bg='black')
+        separator.place(x=0, y=46)
+        frame.pack()
+
+    def show_product_menus(self):
+        """Функция для отрисовки фрейма менюшек выбора значений"""
+        self.product_menus_frame = tk.Frame(self, width=500, height=330)
+        self.product_menus_frame.pack()
+
+    def show_saved_names_frame(self):
+        """Функция для отрисовки фрейма с отображением сохраненных имен"""
+        frame = tk.Frame(self, width=500, height=50, bg='violet')
+        frame.pack()
+
+    def show_buttons(self):
+        """Функция для отрисовки кнопок"""
+        frame = tk.Frame(self, width=500, height=30, bg='green')
+        frame.pack()
+
+    def product_menus_frame_clearing(self):
+        """Очистка меню-виджета от ненужных фреймов"""
+        for widget in self.product_menus_frame.winfo_children():
+            widget.destroy()
+
+    def set_product_description(self, value):
+        self.product_description = Lib.ProductFactory.get_product_descr(value)
+
+    def __show_full_name_frame(self):
+        full_name_label = tk.Label(self.product_menus_frame, text='Введите полное имя продукта')
+        full_name_label.place(x=2, y=0)
+        self.full_name_variable = tk.StringVar()
+        full_name_entry = tk.Entry(self.product_menus_frame, width=39)
+        full_name_entry.place(x=2, y=20)
+
+    def __show_short_name_frame(self):
+        short_name_label = tk.Label(self.product_menus_frame, text="Выберите короткое имя")
+        short_name_label.place(x=2, y=41)
+        self.short_name_cb = Combobox(self.product_menus_frame, width=36, state="readonly",
+                                      values=Lib.ProductFactory.short_name_list())
+        self.short_name_cb.place(x=2, y=61)
+
+    def __show_book_format_frame(self):
+        book_format_label = tk.Label(self.product_menus_frame, text="Выберите формат книги")
+        book_format_label.place(x=2, y=82)
+        self.book_format_cb = Combobox(self.product_menus_frame, width=36, state="readonly",
+                                       values=Lib.ProductFactory.book_format_list())
+        self.book_format_cb.place(x=2, y=102)
+
+    def __show_book_option_frame(self):
+        book_option_label = tk.Label(self.product_menus_frame, text="Выберите опции сборки книги")
+        book_option_label.place(x=2, y=123)
+        self.book_option_cb = Combobox(self.product_menus_frame, width=36, state="readonly",
+                                       values=Lib.ProductFactory.book_option_list())
+        self.book_option_cb.place(x=2, y=143)
+
+    def __show_lamination_frame(self):
+        book_lamination_label = tk.Label(self.product_menus_frame, text='Выберите ламинацию для продукта')
+        book_lamination_label.place(x=2, y=164)
+        self.book_lamination_cb = Combobox(self.product_menus_frame, width=36, state="readonly",
+                                           values=Lib.ProductFactory.lamination())
+        self.book_lamination_cb.place(x=2, y=184)
+
+    def __show_cover_print_mat_frame(self):
+        cover_print_mat_lbl = tk.Label(self.product_menus_frame, text="Выберите печатный материал обложки")
+        cover_print_mat_lbl.place(x=250, y=0)
+        self.cover_print_mat_cb = Combobox(self.product_menus_frame, width=36, state="readonly",
+                                           values=Lib.ProductFactory.cover_print_mat())
+        self.cover_print_mat_cb.place(x=250, y=20)
+
+    def __show_cover_carton_frame(self):
+        cover_carton_format_lbl = tk.Label(self.product_menus_frame, text="Выберите картонку для обложки")
+        cover_carton_format_lbl.place(x=250, y=41)
+        self.cover_carton_format_combo = Combobox(self.product_menus_frame, width=36, state="readonly",
+                                                  values=Lib.ProductFactory.cover_carton_list())
+        self.cover_carton_format_combo.place(x=250, y=61)
+
+    def __show_page_print_mat_frame(self):
+        page_print_mat_lbl = tk.Label(self.product_menus_frame, text="Выберите печатный материал разворотов")
+        page_print_mat_lbl.place(x=250, y=82)
+        self.page_print_mat_cb = Combobox(self.product_menus_frame, width=36, state="readonly",
+                                          values=Lib.ProductFactory.page_print_mat())
+        self.page_print_mat_cb.place(x=250, y=102)
+
+    def __show_tablet_check_frame(self):
+        self.is_tablet_chb_var = tk.IntVar(self.product_menus_frame)
+        self.is_tablet_chb_var.set(int(self.product_description['is_tablet']))
+        is_tablet_chb = tk.Checkbutton(self.product_menus_frame, text='Книга является планшетом',
+                                       variable=self.is_tablet_chb_var)
+        is_tablet_chb.place(x=250, y=160)
+
+    def __show_guideline_value_frame(self):
+        guideline_value_label = tk.Label(self.product_menus_frame, text="Введите значение в мм для направляющих")
+        guideline_value_label.place(x=2, y=210)
+        self.gl_value_var = tk.StringVar(self.product_menus_frame)
+        guideline_value_entry = tk.Entry(self.product_menus_frame, width=39, textvariable=self.gl_value_var)
+        guideline_value_entry.place(x=2, y=230)
+
+    def __show_guideline_length_frame(self):
+        guideline_length_label = tk.Label(self.product_menus_frame, text="Введите длинну в мм для направляющих")
+        guideline_length_label.place(x=2, y=251)
+        self.gl_length_var = tk.StringVar(self.product_menus_frame)
+        guideline_length_entry = tk.Entry(self.product_menus_frame, width=39, textvariable=self.gl_length_var)
+        guideline_length_entry.place(x=2, y=271)
+    
+    def __show_cover_canal_frame(self):
+        cover_canal_label = tk.Label(self.product_menus_frame, text="Выберите 'канал' для обложки")
+        cover_canal_label.place(x=250, y=210)
+        self.cover_canal_cb = Combobox(self.product_menus_frame, width=36, state="readonly",
+                                       values=Lib.ProductFactory.cover_canal_list())
+        self.cover_canal_cb.place(x=250, y=230)
+
+    def __show_page_canal_frame(self):
+        cover_canal_label = tk.Label(self.product_menus_frame, text="Выберите 'канал' для разворотов")
+        cover_canal_label.place(x=250, y=251)
+        self.cover_canal_cb = Combobox(self.product_menus_frame, width=36, state="readonly",
+                                       values=Lib.ProductFactory.page_canal_list())
+        self.cover_canal_cb.place(x=250, y=271)
+
+    def __show_decoding_overlap_frame(self):
+        decoding_overlap_label = tk.Label(self.product_menus_frame, text="НАХЛЕСТ для переплета в мм")
+        decoding_overlap_label.place(x=250, y=210)
+        self.dc_overlap_var = tk.StringVar(self.product_menus_frame)
+        decoding_overlap_entry = tk.Entry(self.product_menus_frame, width=39, textvariable=self.dc_overlap_var)
+        decoding_overlap_entry.place(x=250, y=230)
+
+    def __show_decoding_top_indent_frame(self):
+        decoding_top_indent_label = tk.Label(self.product_menus_frame, text="Введите значение отступа СВЕРХУ в мм")
+        decoding_top_indent_label.place(x=250, y=251)
+        self.dc_top_indent_var = tk.StringVar(self.product_menus_frame)
+        decoding_top_indent_entry = tk.Entry(self.product_menus_frame, width=39, textvariable=self.dc_top_indent_var)
+        decoding_top_indent_entry.place(x=250, y=271)
+
+    def __show_decoding_left_indent_frame(self):
+        decoding_left_indent_label = tk.Label(self.product_menus_frame, text="Введите значение отступа СЛЕВА в мм")
+        decoding_left_indent_label.place(x=250, y=291)
+        self.dc_left_indent_var = tk.StringVar(self.product_menus_frame)
+        decoding_left_indent_entry = tk.Entry(self.product_menus_frame, width=39, textvariable=self.dc_left_indent_var)
+        decoding_left_indent_entry.place(x=250, y=311)
+
+    def init_menu_lines(self):
+        """Отображает менюшки на self.product_menus_frame согласно выбранному продукту"""
+        frames = {'product_name': lambda: self.__show_full_name_frame(),
+                  'short_name': lambda: self.__show_short_name_frame(),
+                  'book_format': lambda: self.__show_book_format_frame(),
+                  'book_option': lambda: self.__show_book_option_frame(),
+                  'lamination': lambda: self.__show_lamination_frame(),
+                  'cover_print_mat': lambda: self.__show_cover_print_mat_frame(),
+                  'cover_carton': lambda: self.__show_cover_carton_frame(),
+                  'page_print_mat': lambda: self.__show_page_print_mat_frame(),
+                  'is_tablet': lambda: self.__show_tablet_check_frame(),
+                  'gl_value': lambda: self.__show_guideline_value_frame(),
+                  'gl_length': lambda: self.__show_guideline_length_frame(),
+                  'cover_canal': lambda: self.__show_cover_canal_frame(),
+                  'page_canal': lambda: self.__show_page_canal_frame(),
+                  'dc_overlap': lambda: self.__show_decoding_overlap_frame(),
+                  'dc_top_indent': lambda: self.__show_decoding_top_indent_frame(),
+                  'dc_left_indent': lambda: self.__show_decoding_left_indent_frame()}
+        for key in self.product_description.keys():
+            value = frames.get(key)
+            if value:
+                value()
+        separator = tk.Canvas(self.product_menus_frame, width=496, height=1, bg='black')
+        separator.place(x=0, y=207)
 
 
 class AddToLibWindow(LibraryWindow):
     def __init__(self, parent_root):
         super().__init__(parent_root)
-        self.title('Добавить продукт в Библиотеку')
-        self.show_category_frame()
+        self.title('Добавление продукта')
+        self.show_category_frame(self.add_event)
+        self.show_product_menus()
+        self.show_buttons()
 
-    def show_category_frame(self):
-        frame = tk.Frame(self, width=500, height=50, bg='red')
-        label = tk.Label(frame, text='Выберите категорию')
-        label.place(x=200, y=1)
-        combobox = Combobox(frame, state="readonly", width=40, values=self.get_book_category())
-        combobox.place(x=130, y=25)
-        frame.pack()
+    def add_event(self, event=None):
+        self.product_menus_frame_clearing()
+        self.set_product_description(self.category_combobox.get())
+        self.init_menu_lines()
+
+
+class ChangeLibWindow(LibraryWindow):
+    def __init__(self, parent_root):
+        super().__init__(parent_root)
+        self.title('Измeнение продукта')
+        self.show_category_frame()
+        self.show_saved_names_frame()
+        self.show_product_menus()
+        self.show_buttons()
+
+
+class DeleteFromLibWindow(LibraryWindow):
+    def __init__(self, parent_root):
+        super().__init__(parent_root)
+        self.title('Удаление продукта')
+        self.show_category_frame()
+        self.show_saved_names_frame()
+        self.show_buttons()
 
 
 def init_cells():
@@ -345,15 +557,20 @@ def init_cells():
 
 def show_menus():
     def init_settings_window(): SettingsWindow(root)
+
     def init_add_to_lib_window(): AddToLibWindow(root)
+
+    def init_change_lib_window(): ChangeLibWindow(root)
+
+    def init_delete_from_lib_window(): DeleteFromLibWindow(root)
 
     settings_menu = tk.Menu(tearoff=0)
     settings_menu.add_command(label="Общие настройки", command=init_settings_window)
 
     library_menu = tk.Menu(tearoff=0)
     library_menu.add_command(label='Добавить продукт', command=init_add_to_lib_window)
-    library_menu.add_command(label='Изменить продукт')
-    library_menu.add_command(label='Удалить продукт')
+    library_menu.add_command(label='Изменить продукт', command=init_change_lib_window)
+    library_menu.add_command(label='Удалить продукт', command=init_delete_from_lib_window)
 
     main_menu = tk.Menu()
     main_menu.add_cascade(label="Настройки", menu=settings_menu)

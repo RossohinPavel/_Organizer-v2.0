@@ -1,4 +1,5 @@
 import Modules.Configs as Conf
+from collections import Counter
 import os
 import re
 
@@ -13,7 +14,7 @@ class Order:
         self.content = self.get_order_content()
         self.content_type = self.get_content_type()
         self.content_count = self.get_content_count()
-        print(self.content_count, self.name)
+        print(self.name, self.content_type, self.content_count)
 
     def get_order_content(self) -> tuple:
         """Метод для формирования содержимого заказа. Также проверяет на то, что не включены технические папки."""
@@ -39,14 +40,59 @@ class Order:
         photo_dct = {}
         for paper in os.listdir(path):
             for form in os.listdir(f'{path}/{paper}'):
-                paper_format, mpcr = form[5:].split('--')
+                paper_format, multiplier = form[5:].split('--')
                 name = f'{paper_type.get(paper, "Fuji ???")} {paper_format}'
-                photo_dct[name] = photo_dct.get(name, 0) + len(os.listdir(f'{path}/{paper}/{form}')) * int(mpcr)
+                photo_dct[name] = photo_dct.get(name, 0) + len(os.listdir(f'{path}/{paper}/{form}')) * int(multiplier)
         return photo_dct
 
-    def book_count(self, name) -> dict:
-        """Основной метод для подсчета изображений в книгах"""
-        pass
+    def book_count(self, product_name) -> tuple:
+        """Основной метод для подсчета изображений в книгах. Также определяет тип совмещения.
+        Возвращает значения в следующем порядке:
+        (Общее кол-во обложек, общее кол-во разворотов, комплексный счетчик, порядок совмещения обложек и блоков)"""
+        path = f'{self.path}/{self.name}/{product_name}'
+        ex_list = []
+        const_list = []
+        for catalog in os.listdir(path):
+            catalog_path = f'{path}/{catalog}'
+            if re.fullmatch(r'\d{3}', catalog):
+                pic_length = len([x for x in os.listdir(catalog_path) if re.fullmatch(r'\d{3}__\d{3}\.jpg', x)])
+                ex_list.append(pic_length if pic_length else 1)
+                continue
+            if re.fullmatch(r'\d{3}-\d+_pcs', catalog):
+                multiplier = int(re.split('[-_]', catalog)[1])
+                pic_length = len([x for x in os.listdir(catalog_path) if re.fullmatch(r'\d{3}__\d{3}-\d+_pcs\.jpg', x)])
+                ex_list.extend([pic_length if pic_length else 1]*multiplier)
+                continue
+            if catalog == 'Constant':
+                const_list.extend([x for x in os.listdir(catalog_path) if re.fullmatch(r'(\d+|cover)_\d+_pcs\.jpg', x)])
+        cover_count = len(ex_list)
+        page_count = sum(ex_list)
+        return cover_count, page_count, self.get_complex_count(ex_list), self.get_combination(cover_count, page_count, const_list)
+
+    @staticmethod
+    def get_complex_count(ex_list) -> str:
+        """Метод для формирования комплексного счетчика"""
+        return ' '.join(f'{v}/{k}' for k, v in sorted(Counter(ex_list).items(), key=lambda x: (x[1], x[0])))
+
+    @staticmethod
+    def get_combination(cover_count, page_count, const_list):
+        """Метод для определения типа совмещения обложек и блоков. Для одиночной книги возвращаем None"""
+        if cover_count != 1:
+            cover_exist = False
+            const_page_count = 0
+            for name in const_list:
+                if re.fullmatch(r'cover_\d+_pcs\.jpg', name):
+                    cover_exist = True
+                if re.fullmatch(r'\d\d\d_\d+_pcs\.jpg', name):
+                    const_page_count += int(name.split('_')[1])
+            if cover_exist and const_page_count == page_count:
+                return "Копии"
+            if cover_exist:
+                return 'О_О'
+            if const_page_count == page_count:
+                return 'В_О'
+            return 'Индивидуально'
+
 
 
 def get_settings():
