@@ -1,4 +1,4 @@
-class ProductFactory:
+class Product:
     __PRODUCT_DESCRIPTION = {"Фотокнига Стандарт": {'product_name': '', 'short_name': '', 'book_format': '',
                                                     'book_option': '', 'lamination': '',
                                                     'cover_print_mat': '', 'page_print_mat': '', 'cover_carton': '',
