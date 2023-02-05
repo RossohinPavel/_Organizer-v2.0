@@ -1,13 +1,5 @@
 import pickle
 
 
-class SomeClass:
-    __ATTR = 'test'
-
-    @classmethod
-    def some_func(cls):
-        return 'test'
-
-
-with open('test.pcl', 'wb') as file:
-    pickle.dump(SomeClass(), file)
+with open('../Configs/library.pcl', 'rb') as file:
+    print(pickle.load(file))
