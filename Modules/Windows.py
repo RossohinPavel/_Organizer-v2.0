@@ -8,6 +8,7 @@ import Modules.Configs as Conf
 import Modules.Roddom as Roddom
 import Modules.FileProcessor as FileProc
 import Modules.Library as Lib
+import Modules.LogCreator as Log
 
 
 class Window(tk.Tk):
@@ -20,6 +21,15 @@ class Window(tk.Tk):
     def init_cells(self):
         def init_roddom_window(): RoddomWindow(self)
 
+        def init_log(): Log.main()
+
+        def init_sticgen(): print('sticgen')
+
+        info_cell_label = CellLabel(master=self, label_text='Работа с заказами', label_color='#ed95b7')
+        info_cell_label.pack()
+        info_cell = CellTwoButton(master=self, bt_l_name='Обновить БД', bt_r_name='СтикГен',
+                                  bt_l_func=init_log, bt_r_func=init_sticgen)
+        info_cell.pack()
         fotoprint_label = CellLabel(master=self, label_color='pale green1', label_text='Фотопечать')
         fotoprint_label.pack()
         roddom_cell = CellOneButton(master=self, func_name='Роддом', func=init_roddom_window, pd_x=50)
@@ -73,6 +83,18 @@ class CellOneButton(tk.Frame):
         self.config(width=270)
         self.button = tk.Button(self, text=func_name, relief=tk.FLAT, fg="#eee", bg="#454545", command=func, padx=pd_x)
         self.button.pack(pady=3)
+
+
+class CellTwoButton(tk.Frame):
+    """Конструктор для парных кнопок"""
+    def __init__(self, bt_l_name='Название кнопки', bt_l_func=None, bt_r_name='Название кнопки', bt_r_func=None,
+                 *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.config(width=270)
+        self.l_button = tk.Button(self, text=bt_l_name, command=bt_l_func, relief=tk.FLAT, fg="#eee", bg="#454545")
+        self.l_button.pack(side='left', ipadx=20, padx=10, pady=3)
+        self.r_button = tk.Button(self, text=bt_r_name, command=bt_r_func, relief=tk.FLAT, fg="#eee", bg="#454545")
+        self.r_button.pack(side='right', ipadx=20, padx=10, pady=3)
 
 
 class ChildWindow(tk.Toplevel):
@@ -262,6 +284,7 @@ class SettingsWindow(ChildWindow):
         self.show_directory_widget('Диск оператора фотопечати', 'fotoprint_temp_dir')
         self.show_directory_widget('Папка для сохранения заказов', 'order_main_dir')
         self.to_parent_center()
+        self.resizable(False, False)
         self.focus()
 
     def show_autolog_widget(self):
@@ -391,6 +414,7 @@ class LibraryWindow(ChildWindow):
         self.category_combobox = None  # Для отрисовки комбобокса категорий и сохранения его значений
         self.names_combobox = None      # Для отрисовки комбобокса с сохраненными именами продуктов
         self.product_menus_frame = None  # Фрейм, на котором рисуются менюшки с выбором
+        self.resizable(False, False)
 
 
     def show_category_frame(self, cb_bind_func):
@@ -476,10 +500,11 @@ class LibraryWindow(ChildWindow):
 
     def get_values_from_menus(self):
         """Получение введенных значений"""
-        if not self.category_combobox.get():
+        category = self.category_combobox.get()
+        if not category:
             return
         full_name = getattr(self, '_product_name').get()
-        values = {}
+        values = {'category': category}
         for key in self.product_description:
             value = self.__dict__[f'_{key}'].get()
             if value and key in ('gl_value', 'gl_length', 'dc_overlap', 'dc_top_indent', 'dc_left_indent'):
@@ -487,7 +512,7 @@ class LibraryWindow(ChildWindow):
             if value or key in ('is_tablet', 'is_luxe', 'dc_break', 'gl_value', 'gl_length', 'dc_overlap',
                                 'dc_top_indent', 'dc_left_indent'):
                 values[key] = value
-        if len(values) != len(self.product_description) or not full_name:
+        if len(values) - 1 != len(self.product_description) or not full_name:
             return
         return {full_name: values}
 
@@ -501,7 +526,7 @@ class LibraryWindow(ChildWindow):
     def set_values_to_enter_menus(self, name):
         """Установка значений в комбобоксах и энтри на сохраненные"""
         self.__dict__['_product_name'].set(name)
-        product_dict = self.library_dct[self.category_combobox.get()][name]
+        product_dict = self.library_dct[name]
         for key in self.product_description:
             self.__dict__[f'_{key}'].set(product_dict[key])
 
@@ -517,6 +542,7 @@ class AddToLibWindow(LibraryWindow):
         self.show_category_frame(self.category_event)
         self.show_product_menus()
         self.show_buttons('Сохранить продукт в библиотеке', self.add_button)
+        self.to_parent_center()
         self.focus()
 
     def category_event(self, event=None):
@@ -527,7 +553,7 @@ class AddToLibWindow(LibraryWindow):
     def add_button(self):
         dct = self.get_values_from_menus()
         if dct:
-            self.library_dct[self.category_combobox.get()].update(dct)
+            self.library_dct.update(dct)
             self.clear_menus_entered_values()
             self.save_library()
             tkmb.showinfo(title='Добавление продукта', message='Продукт успешно добавлен в библиотеку')
@@ -541,11 +567,13 @@ class ChangeLibWindow(LibraryWindow):
         self.show_saved_names_frame(self.names_event)
         self.show_product_menus()
         self.show_buttons('Обновить значения', self.change_button)
+        self.to_parent_center()
         self.focus()
 
     def category_event(self, event=None):
         self.names_combobox.set('')
-        self.names_combobox.config(values=tuple(self.library_dct[self.category_combobox.get()].keys()))
+        category = self.category_combobox.get()
+        self.names_combobox.config(values=tuple(k for k, v in self.library_dct.items() if v['category'] == category))
         self.product_menus_frame_clearing()
 
     def names_event(self, event=None):
@@ -559,9 +587,10 @@ class ChangeLibWindow(LibraryWindow):
     def change_button(self):
         dct = self.get_values_from_menus()
         if dct:
-            self.library_dct[self.category_combobox.get()].update(dct)
+            self.library_dct.update(dct)
             self.clear_menus_entered_values()
             self.save_library()
+            self.names_combobox.set('')
             tkmb.showinfo(title='Изменение продукта', message='Значения продукта успешно обновлены')
 
 
@@ -572,16 +601,19 @@ class DeleteFromLibWindow(LibraryWindow):
         self.show_category_frame(self.category_event)
         self.show_saved_names_frame(None)
         self.show_buttons('Удалить продукт из библиотеки', self.del_button)
+        self.to_parent_center()
         self.focus()
 
     def category_event(self, event=None):
-        self.names_combobox.config(values=tuple(self.library_dct[self.category_combobox.get()].keys()))
+        self.names_combobox.set('')
+        category = self.category_combobox.get()
+        self.names_combobox.config(values=tuple(k for k, v in self.library_dct.items() if v['category'] == category))
 
     def del_button(self):
         product_to_del = self.names_combobox.get()
         if product_to_del:
-            self.library_dct[self.category_combobox.get()].pop(product_to_del)
+            self.library_dct.pop(product_to_del)
             self.save_library()
             self.names_combobox.set('')
-            self.names_combobox.config(values=tuple(self.library_dct[self.category_combobox.get()].keys()))
+            self.category_event()
             tkmb.showinfo(title='Удаление продукта', message='Продукт удален из библиотеки')

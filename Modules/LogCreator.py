@@ -7,14 +7,13 @@ import re
 class Order:
     __slots__ = 'path', 'creation_date', 'name', 'content', 'content_count', 'content_type'
 
-    def __init__(self, path, name):
+    def __init__(self, path, name, lib_link):
         self.path = path
         self.creation_date = path.split('/')[-1]
         self.name = name
         self.content = self.get_order_content()
-        self.content_type = self.get_content_type()
+        self.content_type = self.get_content_type(lib_link)
         self.content_count = self.get_content_count()
-        print(self.name, self.content_type, self.content_count)
 
     def get_order_content(self) -> tuple:
         """Метод для формирования содержимого заказа. Также проверяет на то, что не включены технические папки."""
@@ -22,10 +21,14 @@ class Order:
         path = f'{self.path}/{self.name}'
         return tuple(name for name in os.listdir(path) if name not in exclusions and os.path.isdir(f'{path}/{name}'))
 
-    def get_content_type(self) -> tuple:
+    def get_content_type(self, lib) -> tuple:
         """Метод для определения типа продукта. Формирует записи в виде
-        (Базовый тип (для определения обработки), тип продукта). Если не удалось, то к записывается None"""
-        return None
+        (Базовый тип (для определения обработки), тип продукта). Если не удалось, то записывается None"""
+        def func(current_name):
+            for product_name in lib:
+                if re.match(product_name[::-1], current_name[::-1]):
+                    return product_name, lib[product_name]['category']
+        return tuple(func(name) if name != 'PHOTO' else 'PHOTO' for name in self.content)
 
     def get_content_count(self) -> tuple:
         """Метод для подсчета количества изображений в тираже. Формирует 2 разные записи (для фото и для книг)
@@ -93,11 +96,15 @@ class Order:
                 return 'В_О'
             return 'Индивидуально'
 
+    def get_record(self):
+        if not self.content or not self.content_count:
+            return
+        return {self.content[i]: (self.content_count[i], self.content_type[i]) for i in range(len(self.content))}
 
 
 def get_settings():
     """Функия получения настроек для формирования лога"""
-    settings = Conf.read_pcl_for_test('settings')
+    settings = Conf.read_pcl('settings')
     return settings['order_main_dir'], settings['log_check_depth']
 
 
@@ -121,11 +128,23 @@ def get_orderdir_tuple(path) -> tuple:
 
 def main():
     order_main_dir, log_check_depth = get_settings()      # Получаем необходимые настройки для работы
+    library_dct = Conf.read_pcl('library')     # Получаем записи из библиотеки для определения типа продукта
+    flag = False
     for day in reversed(get_daydir_tuple(order_main_dir)):       # Проходим по дням в обратном порядке
-        for name in reversed(get_orderdir_tuple(day)):
-            order = Order(day, name)
-
-
-
-if __name__ == '__main__':
-    main()
+        day_dct = Conf.read_pcl_log(f'{day[-10:]}')
+        if not flag:
+            for name in reversed(get_orderdir_tuple(day)):
+                order = Order(day, name, library_dct).get_record()
+                if not order:
+                    continue
+                if name in day_dct:
+                    old_record = day_dct[name]
+                    if order == old_record:
+                        log_check_depth -= 1
+                day_dct[name] = order
+                if log_check_depth == 0:
+                    flag = True
+                    break
+        Conf.write_pcl_log(f'{day[-10:]}', day_dct)
+        if flag:
+            break
