@@ -1,9 +1,8 @@
 import tkinter as tk
+import tkinter.ttk as ttk
 from tkinter import messagebox as tkmb
 from tkinter import filedialog as tkfd
 from tkinter import colorchooser as tkcc
-from tkinter.ttk import Progressbar
-from tkinter.ttk import Combobox
 
 import Modules.Configs as Conf
 import Modules.Roddom as Roddom
@@ -179,9 +178,9 @@ class RoddomWindow(ChildWindow):
         frame = tk.Frame(self, width=260, height=50)
         separator = tk.Canvas(frame, width=260, height=1, bg='black')
         separator.place(x=0, y=0)
-        text_res_cb = tk.Checkbutton(frame, text='Сохранять результаты в sum.txt', variable=self.text_res_enable)
+        text_res_cb = ttk.Checkbutton(frame, text='Сохранять результаты в sum.txt', variable=self.text_res_enable)
         text_res_cb.place(x=3, y=3)
-        mrk_form_cb = tk.Checkbutton(frame, text='Формировать .mrk файл', variable=self.mrk_form_enable)
+        mrk_form_cb = ttk.Checkbutton(frame, text='Формировать .mrk файл', variable=self.mrk_form_enable)
         mrk_form_cb.place(x=3, y=23)
         frame.pack()
 
@@ -253,7 +252,7 @@ class RoddomWindow(ChildWindow):
         operation_label.place(x=0, y=0)
         file_label = tk.Label(self.info_frame, text='Вторая строчка')
         file_label.place(x=0, y=15)
-        progressbar = Progressbar(self.info_frame, orient=tk.HORIZONTAL, mode="determinate", length=254)
+        progressbar = ttk.Progressbar(self.info_frame, orient=tk.HORIZONTAL, mode="determinate", length=254)
         progressbar.place(x=3, y=40)
         for i in self.order_exist.get_directory_list():
             FileProc.make_dirs(f'{path}/{i}')
@@ -391,14 +390,13 @@ class LibraryWindow(ChildWindow):
     """Конструктор для окон библиотеки"""
     __FRAMES = {'short_name': ('combo', 'Выберите короткое имя', 2, 41),
                 'book_format': ('combo', 'Выберите формат книги', 2, 82),
-                'book_option': ('combo', 'Выберите опции сборки книги', 2, 123),
-                'lamination': ('combo', 'Выберите ламинацию для продукта', 2, 164),
+                'book_option': ('radio', 'Выберите опции сборки книги', 2, 123),
+                'lamination': ('radio', 'Выберите ламинацию для продукта', 2, 164),
                 'cover_print_mat': ('combo', 'Выберите печатный материал обложки', 250, 0),
                 'cover_carton': ('combo', 'Выберите картонку для обложки', 250, 41),
                 'page_print_mat': ('combo', 'Выберите печатный материал разворотов', 250, 82),
-                'is_tablet': ('check', 'Книга является планшетом', 270, 180),
-                'is_luxe': ('check', 'Книга - Люкс', 270, 180),
                 'dc_break': ('check', 'Раскодировка с дублированием', 270, 180),
+                'book_type': ('radio', 'Выберите тип обложки', 250, 123),
                 'gl_value': ('entry', "Введите значение в мм для направляющих", 2, 210),
                 'gl_length': ('entry', 'Введите длинну направляющих в мм', 2, 251),
                 'cover_canal': ('combo', "Выберите 'канал' обложки", 250, 210),
@@ -424,7 +422,7 @@ class LibraryWindow(ChildWindow):
         frame = tk.Frame(self, width=500, height=51)
         label = tk.Label(frame, text='Выберите категорию')
         label.place(x=200, y=1)
-        self.category_combobox = Combobox(frame, state="readonly", width=40, values=Lib.Product.product_type())
+        self.category_combobox = ttk.Combobox(frame, state="readonly", width=40, values=Lib.Product.product_type())
         self.category_combobox.bind('<<ComboboxSelected>>', cb_bind_func)
         self.category_combobox.place(x=130, y=25)
         separator = tk.Canvas(frame, width=496, height=1, bg='black')
@@ -436,7 +434,7 @@ class LibraryWindow(ChildWindow):
         frame = tk.Frame(self, width=500, height=50)
         label = tk.Label(frame, text='Выберите продукт')
         label.place(x=200, y=1)
-        self.names_combobox = Combobox(frame, state="readonly", width=40)
+        self.names_combobox = ttk.Combobox(frame, state="readonly", width=40)
         self.names_combobox.bind('<<ComboboxSelected>>', cb_bind_func)
         self.names_combobox.place(x=130, y=25)
         separator = tk.Canvas(frame, width=496, height=1, bg='black')
@@ -472,7 +470,7 @@ class LibraryWindow(ChildWindow):
         """Конструктор фрейма для отрисовки Комбобокс виджета"""
         text_label = tk.Label(self.product_menus_frame, text=text)
         text_label.place(x=x, y=y)
-        self.__dict__[cb_var] = Combobox(self.product_menus_frame, width=36, state="readonly", values=cb_val)
+        self.__dict__[cb_var] = ttk.Combobox(self.product_menus_frame, width=36, state="readonly", values=cb_val)
         self.__dict__[cb_var].place(x=x, y=y + 20)
 
     def __show_check_frame(self, text, var, x, y):
@@ -482,10 +480,24 @@ class LibraryWindow(ChildWindow):
         check_btn = tk.Checkbutton(self.product_menus_frame, text=text, variable=self.__dict__[var])
         check_btn.place(x=x, y=y)
 
+    def __show_radio_frame(self, text, radio_var, radio_val, x, y):
+        text_label = tk.Label(self.product_menus_frame, text=text)
+        text_label.place(x=x, y=y)
+        self.__dict__[radio_var] = tk.StringVar(self.product_menus_frame, value=radio_val[0])
+        indents = ((0, 20), (50, 20), (100, 20))
+        if radio_var == '_book_type':
+            indents = ((0, 20), (0, 40), (80, 20), (80, 40))
+        for i, name in enumerate(radio_val):
+            i_x, i_y = indents[i]
+            x_pos, y_pos = x + i_x, y + i_y
+            radio = ttk.Radiobutton(self.product_menus_frame, text=name, value=name, variable=self.__dict__[radio_var])
+            radio.place(x=x_pos, y=y_pos)
+
     def init_menu_lines(self):
         """Отображает менюшки на self.product_menus_frame согласно выбранному продукту"""
         setattr(self, '_product_name', None)
         self.__show_entry_frame('Введите полное имя продукта', '_product_name', 2, 0)
+        book_type = self.category_combobox.get()
         for key in self.product_description:
             frame = self.__FRAMES.get(key)
             var = f'_{key}'
@@ -497,6 +509,8 @@ class LibraryWindow(ChildWindow):
                 self.__show_combobox_frame(text, var, getattr(Lib.Product, key)(), x, y)
             if tip == 'check':
                 self.__show_check_frame(text, var, x, y)
+            if tip == 'radio':
+                self.__show_radio_frame(text, var, getattr(Lib.Product, key)(book_type), x, y)
         separator = tk.Canvas(self.product_menus_frame, width=496, height=1, bg='black')
         separator.place(x=0, y=207)
 
@@ -509,10 +523,9 @@ class LibraryWindow(ChildWindow):
         values = {'category': category}
         for key in self.product_description:
             value = self.__dict__[f'_{key}'].get()
-            if value and key in ('gl_value', 'gl_length', 'dc_overlap', 'dc_top_indent', 'dc_left_indent'):
+            if key in ('gl_value', 'gl_length', 'dc_overlap', 'dc_top_indent', 'dc_left_indent'):
                 value = int(value) if value.isdigit() else 0
-            if value or key in ('is_tablet', 'is_luxe', 'dc_break', 'gl_value', 'gl_length', 'dc_overlap',
-                                'dc_top_indent', 'dc_left_indent'):
+            if value or key in ('dc_break', 'gl_value', 'gl_length', 'dc_overlap', 'dc_top_indent', 'dc_left_indent'):
                 values[key] = value
         if len(values) - 1 != len(self.product_description) or not full_name:
             return
@@ -631,6 +644,11 @@ class StickerGenWindow(ChildWindow):
         self.show_order_entry_frame()
         self.show_order_info_frame()
         self.show_buttons_frame()
+        self.resizable(False, False)
+        self.to_parent_center()
+        self.grab_set()
+        self.wait_window()
+
 
     def show_order_entry_frame(self):
         frame = tk.Frame(master=self, height=52, width=300)
@@ -651,6 +669,7 @@ class StickerGenWindow(ChildWindow):
                 self.order_info.set(Inf.StickerInfo(order_name, log_dict[order_name], self.library_dct).main())
                 break
         self.order_name.set('')
+        self.to_clipboard()
 
     def show_order_info_frame(self):
         frame = tk.Frame(self, width=300, height=200)

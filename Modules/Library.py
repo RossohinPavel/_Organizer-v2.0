@@ -1,34 +1,25 @@
 class Product:
-    __PRODUCT_DESCRIPTION = {"Фотокнига Стандарт": ('short_name', 'book_format', 'book_option', 'lamination',
-                                                    'cover_print_mat', 'page_print_mat', 'cover_carton',
-                                                    'cover_canal', 'page_canal', 'gl_value', 'gl_length'),
-                             "Фотокнига ЛЮКС": ('short_name', 'book_format', 'book_option', 'lamination', 'is_luxe',
-                                                'cover_print_mat', 'page_print_mat', 'cover_carton', 'cover_canal',
-                                                'page_canal', 'gl_value', 'gl_length'),
-                             "Фотокнига Классик": ('short_name', 'book_format', 'book_option', 'lamination',
-                                                   'cover_print_mat', 'page_print_mat', 'cover_carton',
-                                                   'cover_canal', 'page_canal', 'gl_value', 'gl_length'),
-                             "Фотопланшет Стандарт": ('short_name', 'book_format', 'book_option',
-                                                      'lamination', 'is_tablet', 'cover_print_mat', 'page_print_mat',
-                                                      'cover_carton', 'cover_canal', 'page_canal'),
-                             "Фотокнига Flex Bind": ('short_name', 'book_format', 'lamination', 'cover_print_mat',
-                                                     'page_print_mat', 'cover_carton', 'gl_value', 'gl_length',
-                                                     'dc_overlap', 'dc_top_indent', 'dc_left_indent', 'dc_break'),
-                             "Layflat": ('short_name', 'book_format', 'book_option', 'lamination', 'cover_print_mat',
-                                         'page_print_mat', 'cover_carton', 'gl_value', 'gl_length', 'is_tablet'),
-                             "Фотоальбом полиграфический": ('short_name', 'book_format', 'lamination',
-                                                            'cover_print_mat', 'page_print_mat', 'cover_carton',
-                                                            'gl_value', 'gl_length', 'dc_overlap', 'dc_top_indent',
-                                                            'dc_left_indent'),
-                             "Фотоальбом PUR": ('short_name', 'book_format', 'lamination', 'cover_print_mat',
-                                                'page_print_mat', 'cover_carton', 'gl_value', 'gl_length',
-                                                'dc_overlap', 'dc_top_indent', 'dc_left_indent'),
-                             "Фотожурнал": ('short_name', 'book_format', 'cover_print_mat', 'page_print_mat'),
-                             "Фотопапка": ('short_name', 'book_format', 'lamination',
-                                           'cover_print_mat', 'page_print_mat', 'cover_carton'),
-                             "Фотопечать SRA": ('short_name', 'cover_print_mat'),
-                             "Субпродукты": ('short_name', 'cover_print_mat')
-                             }
+    __DESCRIPTION = {"Фотокнига Премиум": ('short_name', 'book_format', 'book_option', 'lamination',
+                                           'cover_print_mat', 'page_print_mat', 'cover_carton',
+                                           'book_type', 'cover_canal', 'page_canal', 'gl_value', 'gl_length'),
+                     "Фотокнига Flex Bind": ('short_name', 'book_format', 'lamination',
+                                             'cover_print_mat', 'page_print_mat', 'cover_carton',
+                                             'gl_value', 'gl_length',
+                                             'dc_overlap', 'dc_top_indent', 'dc_left_indent', 'dc_break'),
+                     "Фотокнига выпускника": ('short_name', 'book_format', 'book_option', 'lamination',
+                                              'cover_print_mat', 'page_print_mat', 'cover_carton',
+                                              'book_type', 'cover_canal', 'page_canal', 'gl_value', 'gl_length'),
+                     "Фотопапка": ('short_name', 'book_format', 'lamination',
+                                   'cover_print_mat', 'page_print_mat', 'cover_carton'),
+                     "Фотожурнал": ('short_name', 'book_format', 'cover_print_mat', 'page_print_mat'),
+                     "Layflat": ('short_name', 'book_format', 'book_option', 'lamination', 'cover_print_mat',
+                                 'page_print_mat', 'cover_carton', 'gl_value', 'gl_length', 'book_type'),
+                     "Альбом и PUR": ('short_name', 'book_format', 'lamination',
+                                      'cover_print_mat', 'page_print_mat', 'cover_carton',
+                                      'gl_value', 'gl_length', 'dc_overlap', 'dc_top_indent', 'dc_left_indent'),
+                     "Фотопечать SRA": ('short_name', 'cover_print_mat'),
+                     "Субпродукты": ('short_name', 'cover_print_mat')
+                     }
 
     __SHORT_NAME_LIST = ("КС", "Люкс", "кКожа", "ФБ", "ППК", "КК", "ПС", "кМикс", "пМикс", "ПК", "ПА", "ПУР", "Дуо",
                          "Дуо гор", "Трио", "Журнал", "+полигр фото")
@@ -59,15 +50,17 @@ class Product:
     __COVER_CARTON_LIST = ("145х153", "145x205", "193x153", "193x205", "193x300", "293x205", "248x255", "293x300",
                            "153x205", "200x153", "200x205", "200x300", "200x300 2.0", "300x205", "255x255", "300x300")
 
+    __BOOK_TYPE_TEXT = {"Фотокнига Премиум": ('Книга', 'Люкс', 'Кожаный корешок', 'Кожаная обложка'),
+                        "Фотокнига выпускника": ('Книга', 'Планшет'), "Layflat": ('Книга', 'Планшет')}
+
     __COVER_CANAL_LIST = ('160', '161', '162', '163', '164', '165', '166', '214', '205', '245', '243', '240', '242',
                           '266', '36', '204', 'POLI', 'ORAJET')
 
     __PAGE_CANAL_LIST = ('201', '214', '203', '204', '205', '207', '275', '274', '276', '271')
 
-
     @classmethod
     def product_type(cls) -> tuple:
-        return tuple(cls.__PRODUCT_DESCRIPTION.keys())
+        return tuple(cls.__DESCRIPTION.keys())
 
     @classmethod
     def short_name(cls) -> tuple:
@@ -78,11 +71,11 @@ class Product:
         return cls.__BOOK_FORMAT_LIST
 
     @classmethod
-    def book_option(cls) -> tuple:
+    def book_option(cls, v=None) -> tuple:
         return cls.__BOOK_OPTION_LIST
 
     @classmethod
-    def lamination(cls) -> tuple:
+    def lamination(cls, v=None) -> tuple:
         return cls.__LAMINATION
 
     @classmethod
@@ -98,6 +91,10 @@ class Product:
         return cls.__COVER_CARTON_LIST
 
     @classmethod
+    def book_type(cls, book_type) -> tuple:
+        return cls.__BOOK_TYPE_TEXT[book_type]
+
+    @classmethod
     def cover_canal(cls) -> tuple:
         return cls.__COVER_CANAL_LIST
 
@@ -107,4 +104,4 @@ class Product:
 
     @classmethod
     def get_product_descr(cls, product_type) -> tuple:
-        return cls.__PRODUCT_DESCRIPTION[product_type]
+        return cls.__DESCRIPTION[product_type]
