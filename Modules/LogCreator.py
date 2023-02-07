@@ -25,10 +25,12 @@ class Order:
         """Метод для определения типа продукта. Формирует записи в виде
         (Базовый тип (для определения обработки), тип продукта). Если не удалось, то записывается None"""
         def func(current_name):
+            if current_name == 'PHOTO':
+                return 'PHOTO', 'PHOTO'
             for product_name in lib:
                 if re.match(product_name[::-1], current_name[::-1]):
                     return product_name, lib[product_name]['category']
-        return tuple(func(name) if name != 'PHOTO' else 'PHOTO' for name in self.content)
+        return tuple(func(name) for name in self.content)
 
     def get_content_count(self) -> tuple:
         """Метод для подсчета количества изображений в тираже. Формирует 2 разные записи (для фото и для книг)

@@ -4,11 +4,13 @@ from tkinter import filedialog as tkfd
 from tkinter import colorchooser as tkcc
 from tkinter.ttk import Progressbar
 from tkinter.ttk import Combobox
+
 import Modules.Configs as Conf
 import Modules.Roddom as Roddom
 import Modules.FileProcessor as FileProc
 import Modules.Library as Lib
 import Modules.LogCreator as Log
+import Modules.Information as Inf
 
 
 class Window(tk.Tk):
@@ -23,7 +25,7 @@ class Window(tk.Tk):
 
         def init_log(): Log.main()
 
-        def init_sticgen(): print('sticgen')
+        def init_sticgen(): StickerGenWindow(self)
 
         info_cell_label = CellLabel(master=self, label_text='Работа с заказами', label_color='#ed95b7')
         info_cell_label.pack()
@@ -617,3 +619,53 @@ class DeleteFromLibWindow(LibraryWindow):
             self.names_combobox.set('')
             self.category_event()
             tkmb.showinfo(title='Удаление продукта', message='Продукт удален из библиотеки')
+
+
+class StickerGenWindow(ChildWindow):
+    def __init__(self, parent_root):
+        super().__init__(parent_root)
+        self.title('Генерация наклеек')
+        self.order_name = tk.StringVar()
+        self.order_info = tk.StringVar()
+        self.library_dct = Conf.read_pcl('library')
+        self.show_order_entry_frame()
+        self.show_order_info_frame()
+        self.show_buttons_frame()
+
+    def show_order_entry_frame(self):
+        frame = tk.Frame(master=self, height=52, width=300)
+        label = tk.Label(frame, text='Введите номер заказа')
+        label.place(x=86, y=1)
+        entry = tk.Entry(frame, textvariable=self.order_name)
+        entry.place(x=55, y=27)
+        entry.bind('<Return>', self.get_order_info)
+        entry.focus_set()
+        button = tk.Button(frame, text='Получить', **self.style, command=self.get_order_info)
+        button.place(x=185, y=24)
+        frame.pack()
+
+    def get_order_info(self, event=None):
+        order_name = self.order_name.get()
+        for log_dict in Conf.read_pcl_log_for_sticker():
+            if order_name in log_dict:
+                self.order_info.set(Inf.StickerInfo(order_name, log_dict[order_name], self.library_dct).main())
+                break
+        self.order_name.set('')
+
+    def show_order_info_frame(self):
+        frame = tk.Frame(self, width=300, height=200)
+        frame.pack()
+        label = tk.Label(frame, justify=tk.LEFT, textvariable=self.order_info)
+        label.place(x=1, y=1)
+
+    def show_buttons_frame(self):
+        frame = tk.Frame(self, width=300, height=28)
+        button1 = tk.Button(frame, text='Скопировать в буфер', **self.style, command=self.to_clipboard)
+        button1.place(x=1, y=1)
+        button2 = tk.Button(frame, text='Закрыть', **self.style, command=self.destroy)
+        button2.place(x=242, y=1)
+        frame.pack()
+
+    def to_clipboard(self):
+        self.clipboard_clear()
+        self.clipboard_append(self.order_info.get())

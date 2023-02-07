@@ -1,3 +1,4 @@
+import os
 import pickle
 
 
@@ -39,3 +40,9 @@ def read_pcl_log(name):
     except FileNotFoundError:
         write_pcl_log(name, {})
         return {}
+
+
+def read_pcl_log_for_sticker():
+    for logfile in reversed(os.listdir('Logs')):
+        with open(f'Logs/{logfile}', 'rb') as file:
+            yield pickle.load(file)
