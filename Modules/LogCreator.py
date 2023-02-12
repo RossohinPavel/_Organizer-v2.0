@@ -134,6 +134,7 @@ def main():
     flag = False
     for day in reversed(get_daydir_tuple(order_main_dir)):       # Проходим по дням в обратном порядке
         day_dct = Conf.read_pcl_log(f'{day[-10:]}')
+        day_dct.update({'PATH': f'{order_main_dir}/{day[-10:]}'})
         if not flag:
             for name in reversed(get_orderdir_tuple(day)):
                 order = Order(day, name, library_dct).get_record()

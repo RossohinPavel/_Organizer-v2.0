@@ -1,3 +1,4 @@
+import re
 import tkinter as tk
 import tkinter.ttk as ttk
 from tkinter import messagebox as tkmb
@@ -26,11 +27,23 @@ class Window(tk.Tk):
 
         def init_sticgen(): StickerGenWindow(self)
 
+        def init_smart_proc_window(): SmartProcWindow(self)
+
+        def init_backup_window(): BackUpWindow(self)
+
         info_cell_label = CellLabel(master=self, label_text='Работа с заказами', label_color='#ed95b7')
         info_cell_label.pack()
         info_cell = CellTwoButton(master=self, bt_l_name='Обновить БД', bt_r_name='СтикГен',
                                   bt_l_func=init_log, bt_r_func=init_sticgen)
         info_cell.pack()
+        smart_proc_label = CellLabel(master=self, label_color='dark salmon', label_text='Умная обработка')
+        smart_proc_label.pack()
+        smart_button = CellOneButton(master=self, func_name='Подготовка к печати', pd_x=10, func=init_smart_proc_window)
+        smart_button.pack()
+        bup_label = CellLabel(master=self, label_color='#adc6ed', label_text='Бакап файлов заказа')
+        bup_label.pack()
+        bup_button = CellOneButton(master=self, func_name='Подготовка к печати', pd_x=10, func=init_backup_window)
+        bup_button.pack()
         fotoprint_label = CellLabel(master=self, label_color='pale green1', label_text='Фотопечать')
         fotoprint_label.pack()
         roddom_cell = CellOneButton(master=self, func_name='Роддом', func=init_roddom_window, pd_x=50)
@@ -38,7 +51,7 @@ class Window(tk.Tk):
 
     def set_main_graph_settings(self):
         self.title('Органайзер 2_0 BETA')
-        width, height = 270, 540
+        width, height = 270, 240
         self.geometry(f'{width}x{height}+'
                       f'{(self.winfo_screenwidth() - width) // 2}+'
                       f'{(self.winfo_screenheight() - height) // 2}')
@@ -664,7 +677,7 @@ class StickerGenWindow(ChildWindow):
 
     def get_order_info(self, event=None):
         order_name = self.order_name.get()
-        for log_dict in Conf.read_pcl_log_for_sticker():
+        for log_dict in Conf.read_pcl_log_for_processing():
             if order_name in log_dict:
                 self.order_info.set(Inf.StickerInfo(order_name, log_dict[order_name], self.library_dct).main())
                 break
@@ -688,3 +701,176 @@ class StickerGenWindow(ChildWindow):
     def to_clipboard(self):
         self.clipboard_clear()
         self.clipboard_append(self.order_info.get())
+
+
+class ProcessingWindow(ChildWindow):
+    """Конструктор для окон обработчика заказов"""
+    def __init__(self, parent_root):
+        super().__init__(parent_root)
+        self.order_name_label = None        # Общие переменные для вывода информации
+        self.order_name_entry_var = tk.StringVar(self)
+        self.order_exist = None
+        self.init_local_variables()         # Инициализируем локальные переменные
+        self.processing_info = None
+        self.processing_pb = None
+        self.__main()
+
+    def init_local_variables(self): pass
+
+    def reset_settings_to_default(self): pass
+
+    def show_main_frame(self): pass
+
+    def __main(self):
+        self.config(border=1, relief='solid')
+        self.order_name_entry_widget()
+        self.order_name_label = ttk.Label(master=self, text='Для запуска обработчика введите номер заказа')
+        self.order_name_label.pack()
+        self.show_main_frame()
+        self.buttons_frame()
+        self.overrideredirect(True)
+        self.to_parent_center()
+
+    def order_name_entry_widget(self):
+        frame = tk.Frame(master=self, width=300, height=30)
+        label = ttk.Label(master=frame, text='Введите номер заказа:')
+        label.place(x=20, y=4)
+        entry = ttk.Entry(master=frame, width=10, textvariable=self.order_name_entry_var)
+        entry.bind("<Return>", self.get_order_dict)
+        entry.focus_set()
+        entry.place(x=150, y=4)
+        button = tk.Button(master=frame, **self.style, text='Ввод', padx=10, command=self.get_order_dict)
+        button.place(x=220, y=1)
+        canvas = tk.Canvas(master=frame, width=296, height=1, bg='black')
+        canvas.place(x=0, y=26)
+        frame.pack()
+
+    def get_order_dict(self, event=None):
+        order_name = self.order_name_entry_var.get()
+        self.order_exist = None
+        if re.fullmatch(r'\d{6}', order_name):
+            for day_dict in Conf.read_pcl_log_for_processing():
+                if order_name in day_dict:
+                    self.order_exist = {'PATH': day_dict['PATH'], 'NAME': order_name, 'CONTENTS': day_dict[order_name]}
+                    break
+        if self.order_exist:
+            self.order_name_label.config(text=f'Обработка заказа: {order_name}')
+        else:
+            self.order_name_label.config(text='Для запуска обработчика введите номер заказа')
+        self.order_name_entry_var.set('')
+        self.reset_settings_to_default()
+
+    def buttons_frame(self):
+        frame = tk.Frame(master=self, width=300, height=33)
+        canvas = tk.Canvas(master=frame, width=296, height=1, bg='black')
+        canvas.place(x=0, y=0)
+        run_button = tk.Button(master=frame, **self.style, text='Запустить', padx=5, command=self.init_proc)
+        run_button.place(x=1, y=5)
+        close_button = tk.Button(master=frame, **self.style, text='Выход', command=self.stop_func, padx=5)
+        close_button.place(x=245, y=5)
+        frame.pack()
+
+    def stop_func(self):
+        try:
+            self.destroy()
+        except Exception:
+            pass
+
+    def show_progress_widget(self):
+        for name in self.winfo_children():
+            name.destroy()
+        self.geometry('300x105')
+        self.to_parent_center()
+        self.processing_info = ttk.Label(self, text='Номер заказа\nКоличество и название тиража\nНомер и название файла')
+        self.processing_info.place(x=1, y=1)
+        self.processing_pb = ttk.Progressbar(self, mode="determinate", length=296)
+        self.processing_pb.place(x=1, y=51)
+        self.close_button = tk.Button(self, text='Остановить', **self.style, command=self.stop_func)
+        self.close_button.place(x=221, y=75)
+
+    def init_proc(self):
+        if not self.order_exist:
+            return
+        self.show_progress_widget()
+
+
+class SmartProcWindow(ProcessingWindow):
+    def __init__(self, parent_root):
+        super().__init__(parent_root)
+
+    def type_line_widget(self, text, frame_height, check_option):
+        frame = tk.Frame(master=self, width=300, height=frame_height)
+        label = ttk.Label(master=frame, text=text)
+        label.place(x=0, y=0)
+        coords = ((20, 19), (150, 19), (20, 39), (150, 39), (20, 59))
+        if check_option:
+            for i, v in enumerate(check_option):
+                pos_x, pos_y = coords[i]
+                check_btn = ttk.Checkbutton(frame, text=v)
+                check_btn.place(x=pos_x, y=pos_y)
+        frame.pack()
+
+    def show_undetected_edition_frame(self):
+        label = ttk.Label(self, text='Список нераспознанных тиражей')
+        label.pack()
+        combobox = ttk.Combobox(self, width=45)
+        combobox.pack()
+
+    def show_main_frame(self):
+        self.type_line_widget('Книги на Фотобумаге', 80,
+                              ('Обводка', 'Переименование', 'Направляющие', 'Добавить Бек-Принт', 'Формировать .mrk'))
+        self.type_line_widget("Layflat'ы", 40, ('Направляющие', 'Переименование'))
+        self.type_line_widget("Альбомы, PUR, FlexBind'ы -- Раскодировка", 40, ('Направляющие', 'Переименование'))
+        self.type_line_widget('Журналы -- Раскодировка', 20, None)
+        self.show_undetected_edition_frame()
+
+
+class BackUpWindow(ProcessingWindow):
+    def __init__(self, parent_root):
+        self.order_list_radio = None
+        self.order_list_cb = None
+        self.order_type_radio = None
+        super().__init__(parent_root)
+        self.grab_set()
+        self.wait_window()
+
+    def init_local_variables(self):
+        self.order_list_radio = tk.StringVar(self)
+        self.order_type_radio = tk.StringVar(self)
+        self.reset_settings_to_default()
+
+    def show_main_frame(self):
+        frame = tk.Frame(self, width=300, height=75)
+        order_list_radio1 = ttk.Radiobutton(master=frame, text='Бакапнуть все', command=self.order_list_radio_switcher,
+                                            value='ALL', variable=self.order_list_radio)
+        order_list_radio1.place(x=1, y=2)
+        order_list_radio2 = ttk.Radiobutton(master=frame, text='Выбранный тираж', command=self.order_list_radio_switcher,
+                                            value='CHOSEN', variable=self.order_list_radio)
+        order_list_radio2.place(x=155, y=2)
+        self.order_list_cb = ttk.Combobox(master=frame, state=tk.DISABLED, width=46)
+        self.order_list_cb.place(x=1, y=26)
+        type_radio1 = ttk.Radiobutton(master=frame, text='Все файлы',
+                                      value='ALL', variable=self.order_type_radio)
+        type_radio1.place(x=1, y=51)
+        type_radio2 = ttk.Radiobutton(master=frame, text='Спец-папки',
+                                      value='CCV', variable=self.order_type_radio)
+        type_radio2.place(x=108, y=51)
+        type_radio3 = ttk.Radiobutton(master=frame, text='Экзепляры',
+                                      value='EX', variable=self.order_type_radio)
+        type_radio3.place(x=216, y=51)
+        frame.pack()
+
+    def reset_settings_to_default(self):
+        self.order_list_radio.set('ALL')
+        self.order_type_radio.set('CCV')
+        if self.order_list_cb:
+            self.order_list_cb.config(state=tk.DISABLED)
+
+    def order_list_radio_switcher(self):
+        order_list = self.order_list_radio.get()
+        if order_list == 'ALL':
+            self.order_list_cb.config(state=tk.DISABLED)
+        if order_list == 'CHOSEN':
+            self.order_list_cb.config(state=tk.NORMAL)
+            if self.order_exist:
+                self.order_list_cb.config(values=tuple(self.order_exist['CONTENTS'].keys()))

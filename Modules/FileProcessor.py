@@ -17,3 +17,7 @@ def get_constant_files(path):
     if 'Constant' in os.listdir(path):
         lst = os.listdir(f'{path}/Constant')
     return tuple(name for name in lst if re.fullmatch(r'(\d+|cover)_\d+_pcs\.jpg', name))
+
+
+class OrderBuckup:
+    pass

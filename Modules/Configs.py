@@ -33,7 +33,7 @@ def write_pcl_log(name, value):
         pickle.dump(value, file)
 
 
-def read_pcl_log(name):
+def read_pcl_log(name) -> dict:
     try:
         with open(f'Logs/{name}.pcl', 'rb') as file:
             return pickle.load(file)
@@ -42,7 +42,7 @@ def read_pcl_log(name):
         return {}
 
 
-def read_pcl_log_for_sticker():
+def read_pcl_log_for_processing():
     for logfile in reversed(os.listdir('Logs')):
         with open(f'Logs/{logfile}', 'rb') as file:
             yield pickle.load(file)
