@@ -721,8 +721,11 @@ class ProcessingWindow(ChildWindow):
 
     def show_main_frame(self): pass
 
+    def get_order_settings(self) -> dict: pass
+
     def __main(self):
         self.config(border=1, relief='solid')
+        self.bind('<Control-Return>', self.init_proc)
         self.order_name_entry_widget()
         self.order_name_label = ttk.Label(master=self, text='Для запуска обработчика введите номер заказа')
         self.order_name_label.pack()
@@ -737,6 +740,7 @@ class ProcessingWindow(ChildWindow):
         label.place(x=20, y=4)
         entry = ttk.Entry(master=frame, width=10, textvariable=self.order_name_entry_var)
         entry.bind("<Return>", self.get_order_dict)
+        entry.bind('<Control-Return>', self.init_proc)
         entry.focus_set()
         entry.place(x=150, y=4)
         button = tk.Button(master=frame, **self.style, text='Ввод', padx=10, command=self.get_order_dict)
@@ -773,8 +777,9 @@ class ProcessingWindow(ChildWindow):
     def stop_func(self):
         try:
             self.destroy()
-        except Exception:
+        except:
             pass
+
 
     def show_progress_widget(self):
         for name in self.winfo_children():
@@ -788,10 +793,31 @@ class ProcessingWindow(ChildWindow):
         self.close_button = tk.Button(self, text='Остановить', **self.style, command=self.stop_func)
         self.close_button.place(x=221, y=75)
 
-    def init_proc(self):
+    def init_proc(self, event=None):
         if not self.order_exist:
             return
+        order_settings = self.get_order_settings()
         self.show_progress_widget()
+        self.processing_info.config(text='Формирую задачу')
+        order_obj = None
+        if type(self) == BackUpWindow:
+            order_obj = FileProc.OrderBuckup(order_settings)
+        if type(self) == SmartProcWindow:
+            pass
+        order_obj.get_file_list()
+        total_count = order_obj.get_file_len()
+        counter = 0
+        self.processing_pb['maximum'] = total_count
+        self.processing_pb['value'] = 0
+        self.processing_info.config(text='Создаю каталоги')
+        order_obj.make_dirs()
+        self.update()
+        for order, content, file in order_obj.processing_run():
+            counter += 1
+            self.processing_pb['value'] += 1
+            self.processing_info.config(text=f'{order}\n{content}\n{total_count}/{counter} -- {file}')
+            self.update()
+        self.destroy()
 
 
 class SmartProcWindow(ProcessingWindow):
@@ -871,6 +897,14 @@ class BackUpWindow(ProcessingWindow):
         if order_list == 'ALL':
             self.order_list_cb.config(state=tk.DISABLED)
         if order_list == 'CHOSEN':
-            self.order_list_cb.config(state=tk.NORMAL)
             if self.order_exist:
                 self.order_list_cb.config(values=tuple(self.order_exist['CONTENTS'].keys()))
+            self.order_list_cb.config(state="readonly")
+
+    def get_order_settings(self) -> dict:
+        if self.order_list_radio.get() == 'CHOSEN':
+            chosen_order = self.order_list_cb.get()
+            if chosen_order:
+                self.order_exist['CONTENTS'] = {chosen_order: self.order_exist['CONTENTS'][chosen_order]}
+        self.order_exist.update({'TYPE': self.order_type_radio.get()})
+        return self.order_exist
