@@ -101,6 +101,7 @@ class CellOneButton(tk.Frame):
 
 class CellTwoButton(tk.Frame):
     """Конструктор для парных кнопок"""
+
     def __init__(self, bt_l_name='Название кнопки', bt_l_func=None, bt_r_name='Название кнопки', bt_r_func=None,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -422,13 +423,12 @@ class LibraryWindow(ChildWindow):
     def __init__(self, parent_root):
         super().__init__(parent_root)
         self.product_description = None  # Для хранения словаря с описанием категорий продукта и типов значений
-        self.library_dct = Conf.read_pcl('library')     # Словарь с сохраненными именами
+        self.library_dct = Conf.read_pcl('library')  # Словарь с сохраненными именами
         # Переменные, которые заполняются в зависимости от выбранного окна и выбранного действия
         self.category_combobox = None  # Для отрисовки комбобокса категорий и сохранения его значений
-        self.names_combobox = None      # Для отрисовки комбобокса с сохраненными именами продуктов
+        self.names_combobox = None  # Для отрисовки комбобокса с сохраненными именами продуктов
         self.product_menus_frame = None  # Фрейм, на котором рисуются менюшки с выбором
         self.resizable(False, False)
-
 
     def show_category_frame(self, cb_bind_func):
         """Функция для обображения фрейма категорий. Инициализирует комбобокс с нужным Событием."""
@@ -662,7 +662,6 @@ class StickerGenWindow(ChildWindow):
         self.grab_set()
         self.wait_window()
 
-
     def show_order_entry_frame(self):
         frame = tk.Frame(master=self, height=52, width=300)
         label = tk.Label(frame, text='Введите номер заказа')
@@ -705,23 +704,28 @@ class StickerGenWindow(ChildWindow):
 
 class ProcessingWindow(ChildWindow):
     """Конструктор для окон обработчика заказов"""
+
     def __init__(self, parent_root):
         super().__init__(parent_root)
-        self.order_name_label = None        # Общие переменные для вывода информации
+        self.order_name_label = None  # Общие переменные для вывода информации
         self.order_name_entry_var = tk.StringVar(self)
         self.order_exist = None
-        self.init_local_variables()         # Инициализируем локальные переменные
+        self.init_local_variables()  # Инициализируем локальные переменные
         self.processing_info = None
         self.processing_pb = None
         self.__main()
 
-    def init_local_variables(self): pass
+    def init_local_variables(self):
+        pass
 
-    def reset_settings_to_default(self): pass
+    def reset_settings_to_default(self):
+        pass
 
-    def show_main_frame(self): pass
+    def show_main_frame(self):
+        pass
 
-    def get_order_settings(self) -> dict: pass
+    def get_order_settings(self) -> dict:
+        pass
 
     def __main(self):
         self.config(border=1, relief='solid')
@@ -780,13 +784,13 @@ class ProcessingWindow(ChildWindow):
         except:
             pass
 
-
     def show_progress_widget(self):
         for name in self.winfo_children():
             name.destroy()
         self.geometry('300x105')
         self.to_parent_center()
-        self.processing_info = ttk.Label(self, text='Номер заказа\nКоличество и название тиража\nНомер и название файла')
+        self.processing_info = ttk.Label(self,
+                                         text='Номер заказа\nКоличество и название тиража\nНомер и название файла')
         self.processing_info.place(x=1, y=1)
         self.processing_pb = ttk.Progressbar(self, mode="determinate", length=296)
         self.processing_pb.place(x=1, y=51)
@@ -803,7 +807,7 @@ class ProcessingWindow(ChildWindow):
         if type(self) == BackUpWindow:
             order_obj = FileProc.OrderBuckup(order_settings)
         if type(self) == SmartProcWindow:
-            pass
+            return
         order_obj.get_file_list()
         total_count = order_obj.get_file_len()
         counter = 0
@@ -822,33 +826,91 @@ class ProcessingWindow(ChildWindow):
 
 class SmartProcWindow(ProcessingWindow):
     def __init__(self, parent_root):
+        self.settings_dict = {}
         super().__init__(parent_root)
+        self.grab_set()
+        self.wait_window()
 
-    def type_line_widget(self, text, frame_height, check_option):
+    def type_line_widget(self, book_type, text, frame_height, check_option):
+        self.settings_dict[book_type] = {}
         frame = tk.Frame(master=self, width=300, height=frame_height)
         label = ttk.Label(master=frame, text=text)
         label.place(x=0, y=0)
-        coords = ((20, 19), (150, 19), (20, 39), (150, 39), (20, 59))
+        combobox = ttk.Combobox(frame, width=45, state="readonly")
+        combobox.place(x=4, y=20)
+        coords = ((20, 41), (150, 41), (20, 61), (150, 61), (20, 81))
+        self.settings_dict[book_type].update({'label': label})
+        self.settings_dict[book_type].update({'combobox': combobox})
         if check_option:
+            self.settings_dict[book_type]['checkbutton'] = {}
             for i, v in enumerate(check_option):
                 pos_x, pos_y = coords[i]
-                check_btn = ttk.Checkbutton(frame, text=v)
+                frame.__dict__[v] = tk.BooleanVar(frame)
+                frame.__dict__[v].set(False)
+                check_btn = ttk.Checkbutton(frame, text=v, variable=frame.__dict__[v])
                 check_btn.place(x=pos_x, y=pos_y)
+                self.settings_dict[book_type]['checkbutton'].update({v: (check_btn, frame.__dict__[v])})
         frame.pack()
 
     def show_undetected_edition_frame(self):
+        self.settings_dict['undetected'] = {}
         label = ttk.Label(self, text='Список нераспознанных тиражей')
         label.pack()
         combobox = ttk.Combobox(self, width=45)
         combobox.pack()
+        self.settings_dict['undetected'].update({'label': label, 'combobox': combobox})
+
+    def disable_info_widgets(self):
+        for vals in self.settings_dict.values():
+            vals['label'].config(state=tk.DISABLED)
+            vals['combobox'].config(state=tk.DISABLED)
+            vals['combobox'].set('')
+            cbuns = vals.get('checkbutton', '')
+            if cbuns:
+                for widget, var in cbuns.values():
+                    widget.config(state=tk.DISABLED)
+                    var.set(False)
+
+    def enable_info_widgets(self, order_dct):
+        for key, value in order_dct.items():
+            widgets = self.settings_dict[key]
+            widgets['label'].config(state=tk.NORMAL)
+            widgets['combobox'].config(state='readonly', values=value)
+            cbuns = widgets.get('checkbutton', '')
+            if cbuns:
+                for name, tup in cbuns.items():
+                    tup[0].config(state=tk.NORMAL)
+                    if key == 'fotobook' and name in ('Обводка', 'Направляющие', 'Формировать .mrk') or key in ('polibook', 'albums'):
+                        tup[1].set(True)
 
     def show_main_frame(self):
-        self.type_line_widget('Книги на Фотобумаге', 80,
+        self.type_line_widget('fotobook', 'Книги на Фотобумаге -- Раскидывание по каналам', 100,
                               ('Обводка', 'Переименование', 'Направляющие', 'Добавить Бек-Принт', 'Формировать .mrk'))
-        self.type_line_widget("Layflat'ы", 40, ('Направляющие', 'Переименование'))
-        self.type_line_widget("Альбомы, PUR, FlexBind'ы -- Раскодировка", 40, ('Направляющие', 'Переименование'))
-        self.type_line_widget('Журналы -- Раскодировка', 20, None)
+        self.type_line_widget('polibook', "Layflat'ы -- Извлечение Спец-Папок", 61, ('Направляющие', 'Переименование'))
+        self.type_line_widget('albums', "Альбомы, PUR, FlexBind'ы -- Раскодировка", 61,
+                              ('Направляющие', 'Переименование'))
+        self.type_line_widget('journals', 'Журналы -- Раскодировка', 41, None)
         self.show_undetected_edition_frame()
+        self.disable_info_widgets()
+
+    def get_order_dict(self, event=None):
+        super().get_order_dict()
+        self.disable_info_widgets()
+        if not self.order_exist:
+            return
+        combination = {"Фотокнига Премиум": 'fotobook', "Фотокнига выпускника": 'fotobook', 'Layflat': 'polibook',
+                       'Фотокнига Flex Bind': 'albums', 'Альбом и PUR': 'albums', 'Фотожурнал': 'journals'}
+        book_dict = {}
+        for name, values in self.order_exist['CONTENTS'].items():
+            book_type = values[1]
+            if book_type is not None:
+                book_type = book_type[1]
+            if book_type in combination:
+                book_dict.setdefault(combination[book_type], []).append(name)
+            if book_type not in combination and book_type != 'PHOTO':
+                book_dict.setdefault('undetected', []).append(name)
+        self.enable_info_widgets(book_dict)
+        print(self.settings_dict)
 
 
 class BackUpWindow(ProcessingWindow):
@@ -870,7 +932,8 @@ class BackUpWindow(ProcessingWindow):
         order_list_radio1 = ttk.Radiobutton(master=frame, text='Бакапнуть все', command=self.order_list_radio_switcher,
                                             value='ALL', variable=self.order_list_radio)
         order_list_radio1.place(x=1, y=2)
-        order_list_radio2 = ttk.Radiobutton(master=frame, text='Выбранный тираж', command=self.order_list_radio_switcher,
+        order_list_radio2 = ttk.Radiobutton(master=frame, text='Выбранный тираж',
+                                            command=self.order_list_radio_switcher,
                                             value='CHOSEN', variable=self.order_list_radio)
         order_list_radio2.place(x=155, y=2)
         self.order_list_cb = ttk.Combobox(master=frame, state=tk.DISABLED, width=46)
