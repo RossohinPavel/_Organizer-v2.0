@@ -106,3 +106,70 @@ class OrderBuckup:
             for f_path, f_name in self.file_list[i]:
                 yield self.order_name, f'{contents_len}/{i+1} -- {v}', f_name
                 shutil.copy2(f'{src}/{f_path}/{f_name}', f'{src}/_TO_PRINT/{f_path}/{f_name}')
+
+
+class OrderSmartProcessor:
+    __slots__ = 'object_list', 'order_name'
+
+    def __init__(self, order_dict, library, common_stg):
+        self.order_name = order_dict['NAME']
+        self.object_list = tuple(self.__get_object_list(order_dict, library, common_stg))
+        print(self.object_list)
+
+
+    @staticmethod
+    def __get_object_list(order_dict, library, common_stg):
+        common_stg = {k: v for k, v in common_stg.items() if k in ('stroke_size', 'stroke_color',
+                                                                   'guideline_size', 'guideline_color')}
+        for key, value in order_dict['CONTENTS'].items():
+            edition_type = value[1]
+            if edition_type is None or edition_type[1] == 'PHOTO':
+                continue
+            book_type, edition_type = edition_type
+            obj, proc_stg = None, None
+            if edition_type in ('Фотокнига Премиум', 'Фотокнига выпускника'):
+                obj = FotobookEdition
+                proc_stg = order_dict['TYPE']['fotobook']
+            if edition_type in ('Фотокнига Flex Bind', 'Альбом и PUR'):
+                obj = AlbumEdition
+                proc_stg = order_dict['TYPE']['albums']
+            if edition_type == 'Layflat':
+                obj = PolibookEdition
+                proc_stg = order_dict['TYPE']['polibook']
+            if edition_type == 'Фотожурнал':
+                obj = JournalEdition
+                proc_stg = {}
+            path = f'{order_dict["PATH"]}/{order_dict["NAME"]}'
+            file_stg = library[book_type]
+            file_stg.update(common_stg)
+            yield obj(path, key, proc_stg, file_stg)
+
+
+class Edition:
+    __slots__ = 'path', 'name', 'proc_stg', 'file_stg'
+
+    def __init__(self, path, name, proc_stg, file_stg):
+        self.path = path
+        self.name = name
+        self.proc_stg = proc_stg
+        self.file_stg = file_stg
+
+
+class FotobookEdition(Edition):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+class PolibookEdition(Edition):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+class AlbumEdition(Edition):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+class JournalEdition(Edition):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)

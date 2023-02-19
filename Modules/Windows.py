@@ -14,8 +14,10 @@ import Modules.Information as Inf
 
 
 class Window(tk.Tk):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, o_settings, o_library, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.O_SETTINGS = o_settings        # Сохраняем как атрибут ссылку на настройки и библиотеку
+        self.O_LIBRARY = o_library
         self.init_cells()
         self.show_menus()
         self.set_main_graph_settings()
@@ -145,26 +147,23 @@ class RoddomWindow(ChildWindow):
 
     def __init__(self, parent_root):
         super().__init__(parent_root)
-        # Получаем настройки из конфигов
-        self.settings = Conf.read_pcl('settings')
-        # Основные настройки окна
+        self.order_exist = None         # Переменные, которые используют виджеты
+        self.directory_info = tk.StringVar(self, self.parent_root.O_SETTINGS['roddom_main_dir'])
+        self.order_calc_info = None
+        self.text_res_enable = tk.BooleanVar(self, value=True)
+        self.mrk_form_enable = tk.BooleanVar(self, value=False)
+        self.__main()
+
+    def __main(self):
         self.title('Роддом')
         self.geometry('260x237')
         self.resizable(False, False)
         self.to_parent_center()
-        # Переменные, которые используют виджеты
-        self.order_exist = None
-        self.directory_info = tk.StringVar(self, self.settings['roddom_main_dir'])
-        self.order_calc_info = None
-        self.text_res_enable = tk.IntVar(self, value=1)
-        self.mrk_form_enable = tk.IntVar(self, value=0)
-        # Вызов отрисовки основных виджетов
         self.show_directory_widget()
         self.info_frame = tk.Frame(self, width=260, height=80)
         self.info_frame.pack()
         self.show_cb_frame()
         self.show_buttons_widget()
-        # Фокусировка окна
         self.focus()
 
     def show_directory_widget(self):
@@ -184,8 +183,8 @@ class RoddomWindow(ChildWindow):
         new_path = tkfd.askdirectory()
         if new_path:
             self.directory_info.set(new_path)
-            self.settings['roddom_main_dir'] = new_path
-            Conf.write_pcl('settings', self.settings)
+            self.parent_root.O_SETTINGS['roddom_main_dir'] = new_path
+            Conf.write_pcl('settings', self.parent_root.O_SETTINGS)
 
     def show_cb_frame(self):
         """Функция отрисовки Checkbutton - настроек обработки заказов роддома"""
@@ -214,7 +213,7 @@ class RoddomWindow(ChildWindow):
         order = tkfd.askdirectory(initialdir=self.directory_info.get())
         if not order:
             return
-        self.order_exist = Roddom.RoddomOrder(order, bool(self.text_res_enable.get()), bool(self.mrk_form_enable.get()))
+        self.order_exist = Roddom.RoddomOrder(order, self.text_res_enable.get(), self.mrk_form_enable.get())
         self.order_calc_info = str(self.order_exist)
         self.show_order_info(self.order_calc_info)
         self.info_to_clipboard()
@@ -240,7 +239,7 @@ class RoddomWindow(ChildWindow):
         for i in self.winfo_children():
             if type(i) == tk.Frame:
                 for j in i.winfo_children():
-                    if type(j) == tk.Button and j._name != '!button2':
+                    if type(j) == tk.Button and j.__dict__['_name'] != '!button2':
                         j.config(state="disabled")
 
     def button_enabler(self):
@@ -248,15 +247,13 @@ class RoddomWindow(ChildWindow):
         for i in self.winfo_children():
             if type(i) == tk.Frame:
                 for j in i.winfo_children():
-                    if type(j) == tk.Button and j._name != '!button2':
+                    if type(j) == tk.Button and j.__dict__['_name'] != '!button2':
                         j.config(state="normal")
 
     def to_print(self):
         """Функция отправки в печать. Отображает на экране информацию о коопировани и вызывает методы копирования"""
-        if not self.order_exist:
-            return
-        path = tkfd.askdirectory(initialdir=self.settings['fotoprint_temp_dir'])
-        if not path:
+        path = tkfd.askdirectory(initialdir=self.parent_root.O_SETTINGS['fotoprint_temp_dir'])
+        if not path or not self.order_exist:
             return
         self.order_calc_info = f'{path}\n\nРоддом\n\n{self.order_exist.order_name}'
         self.info_to_clipboard()
@@ -287,31 +284,35 @@ class RoddomWindow(ChildWindow):
 
 
 class SettingsWindow(ChildWindow):
+    """Окно основных настроек приложения"""
     def __init__(self, main_window):
         super().__init__(main_window)
-        self.settings = Conf.read_pcl('settings')
+        self.__main()
+
+    def __main(self):
         self.title('Настройки')
         self.show_autolog_widget()
         self.show_log_check_depth_widget()
-        self.show_cover_processing_settings('Цвет обводки', 'stroke_color', 'Толщина обводки', 'stroke_size')
-        self.show_cover_processing_settings('Цвет направляющих', 'guideline_color', 'Толщина направляющих',
-                                            'guideline_size')
+        self.show_cover_proc_settings('Цвет обводки', 'stroke_color', 'Толщина обводки', 'stroke_size')
+        self.show_cover_proc_settings('Цвет направляющих', 'guideline_color', 'Толщина направляющих', 'guideline_size')
         self.show_directory_widget('Диск оператора фотопечати', 'fotoprint_temp_dir')
         self.show_directory_widget('Папка для сохранения заказов', 'order_main_dir')
-        self.to_parent_center()
         self.resizable(False, False)
         self.focus()
 
     def show_autolog_widget(self):
+        """Функция отрисовки виджета управления Автологом"""
         def update_label_info():
-            autolog_label.config(text='Автолог: Активен' if self.settings['autolog'] else 'Автолог: Отключен')
-            autolog_init_bt.config(text='Отключить' if self.settings['autolog'] else 'Включить')
+            autolog = self.parent_root.O_SETTINGS['autolog']
+            autolog_label.config(text='Автолог: Активен' if autolog else 'Автолог: Отключен')
+            autolog_init_bt.config(text='Отключить' if autolog else 'Включить')
 
         def init_autolog():
-            value = not self.settings['autolog']
-            self.settings['autolog'] = value
+            value = not self.parent_root.O_SETTINGS['autolog']
+            self.parent_root.O_SETTINGS['autolog'] = value
             update_label_info()
-            Conf.write_pcl('settings', self.settings)
+            Conf.write_pcl('settings', self.parent_root.O_SETTINGS)
+            tkmb.showinfo('Автолог', 'Для вступления изменений в силу перезагрузите программу')
 
         frame = tk.Frame(self, width=260, height=30)
         autolog_label = tk.Label(frame)
@@ -324,14 +325,15 @@ class SettingsWindow(ChildWindow):
         frame.pack()
 
     def show_log_check_depth_widget(self):
+        """Функция управления глубиной проверки заказов"""
         def update_text_value():
-            label.config(text=f'Глубина проверки лога - {self.settings["log_check_depth"]} заказов')
+            label.config(text=f'Глубина проверки лога - {self.parent_root.O_SETTINGS["log_check_depth"]} заказов')
 
         def update_depth_value():
             value = entry_var.get()
             if value.isdigit():
-                self.settings['log_check_depth'] = int(value)
-                Conf.write_pcl('settings', self.settings)
+                self.parent_root.O_SETTINGS['log_check_depth'] = int(value)
+                Conf.write_pcl('settings', self.parent_root.O_SETTINGS)
             update_text_value()
             entry.delete(0, tk.END)
 
@@ -348,49 +350,50 @@ class SettingsWindow(ChildWindow):
         separator.place(x=0, y=47)
         frame.pack()
 
-    def show_cover_processing_settings(self, color_text, color_stg_key, size_text, size_stg_key):
+    def show_cover_proc_settings(self, color_text, color_stg_key, size_text, size_stg_key):
+        """Функция-конструктор для управления цветом и толщиной для направляющих и обводки"""
         def update_color():
             color = tkcc.askcolor()
             if color:
-                self.settings[color_stg_key] = color[1]
-                Conf.write_pcl('settings', self.settings)
-            color_btn.config(bg=self.settings[color_stg_key])
+                self.parent_root.O_SETTINGS[color_stg_key] = color[1]
+                Conf.write_pcl('settings', self.parent_root.O_SETTINGS)
+            color_btn.config(bg=self.parent_root.O_SETTINGS[color_stg_key])
 
         def update_size_label():
-            size_label.config(text=f'{size_text}: {self.settings[size_stg_key]} пикселей')
+            size_label.config(text=f'{size_text}: {self.parent_root.O_SETTINGS[size_stg_key]} пикселей')
 
         def update_size(val):
-            self.settings[size_stg_key] = int(val)
-            Conf.write_pcl('settings', self.settings)
+            self.parent_root.O_SETTINGS[size_stg_key] = int(val)
+            Conf.write_pcl('settings', self.parent_root.O_SETTINGS)
             update_size_label()
 
         frame = tk.Frame(self, width=260, height=73)
         label = tk.Label(frame, text=color_text)
         label.place(x=1, y=3)
-        color_btn = tk.Button(frame, relief=tk.FLAT, width=12, bg=self.settings[color_stg_key], command=update_color)
+        color_btn = tk.Button(frame, relief=tk.FLAT, width=12, bg=self.parent_root.O_SETTINGS[color_stg_key],
+                              command=update_color)
         color_btn.place(x=125, y=0)
-
         size_label = tk.Label(frame)
         size_label.place(x=1, y=26)
         scale = tk.Scale(frame, orient=tk.HORIZONTAL, from_=1, to=10, length=255, showvalue=False, command=update_size)
         scale.place(x=0, y=48)
-        scale.set(self.settings[size_stg_key])
+        scale.set(self.parent_root.O_SETTINGS[size_stg_key])
         update_size_label()
-
         separator = tk.Canvas(frame, width=260, height=1, bg='black')
         separator.place(x=0, y=68)
         frame.pack()
 
     def show_directory_widget(self, text, settings_key):
+        """Функция-конструктор для управления основными дирректориями"""
         def update_directory():
             path = tkfd.askdirectory()
             if path:
                 text_var.set(path)
-                self.settings[settings_key] = path
-                Conf.write_pcl('settings', self.settings)
+                self.parent_root.O_SETTINGS[settings_key] = path
+                Conf.write_pcl('settings', self.parent_root.O_SETTINGS)
 
         frame = tk.Frame(self, width=260, height=50)
-        text_var = tk.StringVar(frame, value=self.settings[settings_key])
+        text_var = tk.StringVar(frame, value=self.parent_root.O_SETTINGS[settings_key])
         dir_status_label = tk.Label(frame, text=text)
         dir_status_label.place(x=0, y=0)
         dir_update_button = tk.Button(frame, textvariable=text_var, command=update_directory, width=35, **self.style)
@@ -423,7 +426,6 @@ class LibraryWindow(ChildWindow):
     def __init__(self, parent_root):
         super().__init__(parent_root)
         self.product_description = None  # Для хранения словаря с описанием категорий продукта и типов значений
-        self.library_dct = Conf.read_pcl('library')  # Словарь с сохраненными именами
         # Переменные, которые заполняются в зависимости от выбранного окна и выбранного действия
         self.category_combobox = None  # Для отрисовки комбобокса категорий и сохранения его значений
         self.names_combobox = None  # Для отрисовки комбобокса с сохраненными именами продуктов
@@ -494,6 +496,7 @@ class LibraryWindow(ChildWindow):
         check_btn.place(x=x, y=y)
 
     def __show_radio_frame(self, text, radio_var, radio_val, x, y):
+        """Конструктор для отрисовки Радио-баттон-фреймов"""
         text_label = tk.Label(self.product_menus_frame, text=text)
         text_label.place(x=x, y=y)
         self.__dict__[radio_var] = tk.StringVar(self.product_menus_frame, value=radio_val[0])
@@ -554,13 +557,13 @@ class LibraryWindow(ChildWindow):
     def set_values_to_enter_menus(self, name):
         """Установка значений в комбобоксах и энтри на сохраненные"""
         self.__dict__['_product_name'].set(name)
-        product_dict = self.library_dct[name]
+        product_dict = self.parent_root.O_LIBRARY[name]
         for key in self.product_description:
             self.__dict__[f'_{key}'].set(product_dict[key])
 
     def save_library(self):
         """Пишем в Либу"""
-        Conf.write_pcl('library', self.library_dct)
+        Conf.write_pcl('library', self.parent_root.O_LIBRARY)
 
 
 class AddToLibWindow(LibraryWindow):
@@ -581,7 +584,7 @@ class AddToLibWindow(LibraryWindow):
     def add_button(self):
         dct = self.get_values_from_menus()
         if dct:
-            self.library_dct.update(dct)
+            self.parent_root.O_LIBRARY.update(dct)
             self.clear_menus_entered_values()
             self.save_library()
             tkmb.showinfo(title='Добавление продукта', message='Продукт успешно добавлен в библиотеку')
@@ -598,10 +601,11 @@ class ChangeLibWindow(LibraryWindow):
         self.to_parent_center()
         self.focus()
 
-    def category_event(self, event=None):
+    def category_event(self, event):
         self.names_combobox.set('')
         category = self.category_combobox.get()
-        self.names_combobox.config(values=tuple(k for k, v in self.library_dct.items() if v['category'] == category))
+        names = tuple(k for k, v in self.parent_root.O_LIBRARY.items() if v['category'] == category)
+        self.names_combobox.config(values=names)
         self.product_menus_frame_clearing()
 
     def names_event(self, event=None):
@@ -615,7 +619,7 @@ class ChangeLibWindow(LibraryWindow):
     def change_button(self):
         dct = self.get_values_from_menus()
         if dct:
-            self.library_dct.update(dct)
+            self.parent_root.O_LIBRARY.update(dct)
             self.clear_menus_entered_values()
             self.save_library()
             self.names_combobox.set('')
@@ -635,12 +639,13 @@ class DeleteFromLibWindow(LibraryWindow):
     def category_event(self, event=None):
         self.names_combobox.set('')
         category = self.category_combobox.get()
-        self.names_combobox.config(values=tuple(k for k, v in self.library_dct.items() if v['category'] == category))
+        names = tuple(k for k, v in self.parent_root.O_LIBRARY.items() if v['category'] == category)
+        self.names_combobox.config(values=names)
 
     def del_button(self):
         product_to_del = self.names_combobox.get()
         if product_to_del:
-            self.library_dct.pop(product_to_del)
+            self.parent_root.O_LIBRARY.pop(product_to_del)
             self.save_library()
             self.names_combobox.set('')
             self.category_event()
@@ -650,10 +655,12 @@ class DeleteFromLibWindow(LibraryWindow):
 class StickerGenWindow(ChildWindow):
     def __init__(self, parent_root):
         super().__init__(parent_root)
-        self.title('Генерация наклеек')
         self.order_name = tk.StringVar()
         self.order_info = tk.StringVar()
-        self.library_dct = Conf.read_pcl('library')
+        self.__main()
+
+    def __main(self):
+        self.title('Генерация наклеек')
         self.show_order_entry_frame()
         self.show_order_info_frame()
         self.show_buttons_frame()
@@ -678,7 +685,7 @@ class StickerGenWindow(ChildWindow):
         order_name = self.order_name.get()
         for log_dict in Conf.read_pcl_log_for_processing():
             if order_name in log_dict:
-                self.order_info.set(Inf.StickerInfo(order_name, log_dict[order_name], self.library_dct).main())
+                self.order_info.set(Inf.StickerInfo(order_name, log_dict[order_name], self.parent_root.O_LIBRARY).main())
                 break
         self.order_name.set('')
         self.to_clipboard()
@@ -714,22 +721,26 @@ class ProcessingWindow(ChildWindow):
         self.processing_info = None
         self.processing_pb = None
         self.__main()
+        self.event_flag = True
 
     def init_local_variables(self):
+        """Абстракнтная функция для запуска локальных переменных (в дочерних классах)"""
         pass
 
     def reset_settings_to_default(self):
+        """Абстрактная функция для сброса значений локальных переменных"""
         pass
 
     def show_main_frame(self):
+        """АФ отрисовки основного виджета дочернего обработчика"""
         pass
 
-    def get_order_settings(self) -> dict:
+    def get_order_settings(self):
+        """АФ для получения словаря значений переменых в дочерних классах"""
         pass
 
     def __main(self):
         self.config(border=1, relief='solid')
-        self.bind('<Control-Return>', self.init_proc)
         self.order_name_entry_widget()
         self.order_name_label = ttk.Label(master=self, text='Для запуска обработчика введите номер заказа')
         self.order_name_label.pack()
@@ -737,6 +748,7 @@ class ProcessingWindow(ChildWindow):
         self.buttons_frame()
         self.overrideredirect(True)
         self.to_parent_center()
+        self.bind('<Control-Return>', self.init_proc)
 
     def order_name_entry_widget(self):
         frame = tk.Frame(master=self, width=300, height=30)
@@ -798,15 +810,18 @@ class ProcessingWindow(ChildWindow):
         self.close_button.place(x=221, y=75)
 
     def init_proc(self, event=None):
-        if not self.order_exist:
+        if not self.order_exist or not self.event_flag:
             return
-        order_settings = self.get_order_settings()
+        self.event_flag = False
+        self.get_order_settings()
         self.show_progress_widget()
         self.processing_info.config(text='Формирую задачу')
         order_obj = None
         if type(self) == BackUpWindow:
-            order_obj = FileProc.OrderBuckup(order_settings)
+            order_obj = FileProc.OrderBuckup(self.order_exist)
         if type(self) == SmartProcWindow:
+            order_obj = FileProc.OrderSmartProcessor(self.order_exist, self.parent_root.O_LIBRARY,
+                                                     self.parent_root.O_SETTINGS)
             return
         order_obj.get_file_list()
         total_count = order_obj.get_file_len()
@@ -845,11 +860,12 @@ class SmartProcWindow(ProcessingWindow):
             self.settings_dict[book_type]['checkbutton'] = {}
             for i, v in enumerate(check_option):
                 pos_x, pos_y = coords[i]
-                frame.__dict__[v] = tk.BooleanVar(frame)
-                frame.__dict__[v].set(False)
-                check_btn = ttk.Checkbutton(frame, text=v, variable=frame.__dict__[v])
+                var, rus_text = v
+                frame.__dict__[var] = tk.BooleanVar(frame)
+                frame.__dict__[var].set(False)
+                check_btn = ttk.Checkbutton(frame, text=rus_text, variable=frame.__dict__[var])
                 check_btn.place(x=pos_x, y=pos_y)
-                self.settings_dict[book_type]['checkbutton'].update({v: (check_btn, frame.__dict__[v])})
+                self.settings_dict[book_type]['checkbutton'].update({var: (check_btn, frame.__dict__[var])})
         frame.pack()
 
     def show_undetected_edition_frame(self):
@@ -880,15 +896,17 @@ class SmartProcWindow(ProcessingWindow):
             if cbuns:
                 for name, tup in cbuns.items():
                     tup[0].config(state=tk.NORMAL)
-                    if key == 'fotobook' and name in ('Обводка', 'Направляющие', 'Формировать .mrk') or key in ('polibook', 'albums'):
+                    if key == 'fotobook' and name in ('stroke', 'guideline', 'generate .mrk') or key in ('polibook', 'albums'):
                         tup[1].set(True)
 
     def show_main_frame(self):
         self.type_line_widget('fotobook', 'Книги на Фотобумаге -- Раскидывание по каналам', 100,
-                              ('Обводка', 'Переименование', 'Направляющие', 'Добавить Бек-Принт', 'Формировать .mrk'))
-        self.type_line_widget('polibook', "Layflat'ы -- Извлечение Спец-Папок", 61, ('Направляющие', 'Переименование'))
+                              (('stroke', 'Обводка'), ('rename', 'Переименование'), ('guideline', 'Направляющие'),
+                               ('add backprint', 'Добавить Бек-Принт'), ('generate .mrk', 'Сформировать .mrk')))
+        self.type_line_widget('polibook', "Layflat'ы -- Извлечение Спец-Папок", 61,
+                              (('guideline', 'Направляющие'), ('rename', 'Переименование')))
         self.type_line_widget('albums', "Альбомы, PUR, FlexBind'ы -- Раскодировка", 61,
-                              ('Направляющие', 'Переименование'))
+                              (('guideline', 'Направляющие'), ('rename', 'Переименование')))
         self.type_line_widget('journals', 'Журналы -- Раскодировка', 41, None)
         self.show_undetected_edition_frame()
         self.disable_info_widgets()
@@ -910,7 +928,13 @@ class SmartProcWindow(ProcessingWindow):
             if book_type not in combination and book_type != 'PHOTO':
                 book_dict.setdefault('undetected', []).append(name)
         self.enable_info_widgets(book_dict)
-        print(self.settings_dict)
+
+    def get_order_settings(self):
+        order_settings = {}
+        for key, value in self.settings_dict.items():
+            if key in ('fotobook', 'polibook', 'albums'):
+                order_settings[key] = {k: v[1].get() for k, v in value['checkbutton'].items()}
+        self.order_exist['TYPE'] = order_settings
 
 
 class BackUpWindow(ProcessingWindow):
@@ -964,10 +988,9 @@ class BackUpWindow(ProcessingWindow):
                 self.order_list_cb.config(values=tuple(self.order_exist['CONTENTS'].keys()))
             self.order_list_cb.config(state="readonly")
 
-    def get_order_settings(self) -> dict:
+    def get_order_settings(self):
         if self.order_list_radio.get() == 'CHOSEN':
             chosen_order = self.order_list_cb.get()
             if chosen_order:
                 self.order_exist['CONTENTS'] = {chosen_order: self.order_exist['CONTENTS'][chosen_order]}
         self.order_exist.update({'TYPE': self.order_type_radio.get()})
-        return self.order_exist

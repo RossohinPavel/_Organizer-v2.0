@@ -6,14 +6,16 @@ import time
 import Modules.Windows as Win
 
 
-def read_config_autolog():
-    with open('Configs/settings.pcl', 'rb') as file:
-        return pickle.load(file)['autolog']
+with open('Configs/settings.pcl', 'rb') as file:
+    O_SETTINGS = pickle.load(file)
+
+with open('Configs/library.pcl', 'rb') as file:
+    O_LIBRARY = pickle.load(file)
 
 
 def window_run(q):
     q.put(True)
-    Win.Window().mainloop()
+    Win.Window(O_SETTINGS, O_LIBRARY).mainloop()
     q.put(False)
 
 
@@ -32,7 +34,7 @@ def log_run(q):
 
 
 if __name__ == '__main__':
-    if read_config_autolog():
+    if O_SETTINGS['autolog']:
         q = multiprocessing.Queue()
         proc1 = multiprocessing.Process(target=window_run, args=(q,))
         proc2 = multiprocessing.Process(target=log_run, args=(q,))
@@ -41,4 +43,4 @@ if __name__ == '__main__':
         proc1.join()
         proc2.join()
     else:
-        Win.Window().mainloop()
+        Win.Window(O_SETTINGS, O_LIBRARY).mainloop()

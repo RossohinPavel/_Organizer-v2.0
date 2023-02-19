@@ -23,11 +23,6 @@ def read_pcl(name):
         return pickle.load(file)
 
 
-def read_pcl_for_test(name):
-    with open(f'../Configs/{name}.pcl', 'rb') as file:
-        return pickle.load(file)
-
-
 def write_pcl_log(name, value):
     with open(f'Logs/{name}.pcl', 'wb') as file:
         pickle.dump(value, file)
