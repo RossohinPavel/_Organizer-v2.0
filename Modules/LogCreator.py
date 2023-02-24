@@ -26,10 +26,10 @@ class Order:
         (Базовый тип (для определения обработки), тип продукта). Если не удалось, то записывается None"""
         def func(current_name):
             if current_name == 'PHOTO':
-                return 'PHOTO', 'PHOTO'
+                return 'PHOTO'
             for product_name in lib:
                 if re.match(product_name[::-1], current_name[::-1]):
-                    return product_name, lib[product_name]['category']
+                    return product_name
         return tuple(func(name) for name in self.content)
 
     def get_content_count(self) -> tuple:

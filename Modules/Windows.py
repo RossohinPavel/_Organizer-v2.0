@@ -405,22 +405,23 @@ class SettingsWindow(ChildWindow):
 
 class LibraryWindow(ChildWindow):
     """Конструктор для окон библиотеки"""
-    __FRAMES = {'short_name': ('combo', 'Выберите короткое имя', 2, 41),
-                'book_format': ('combo', 'Выберите формат книги', 2, 82),
-                'book_option': ('radio', 'Выберите опции сборки книги', 2, 123),
-                'lamination': ('radio', 'Выберите ламинацию для продукта', 2, 164),
-                'cover_print_mat': ('combo', 'Выберите печатный материал обложки', 250, 0),
-                'cover_carton': ('combo', 'Выберите картонку для обложки', 250, 41),
-                'page_print_mat': ('combo', 'Выберите печатный материал разворотов', 250, 82),
-                'dc_break': ('check', 'Раскодировка с дублированием', 270, 180),
-                'book_type': ('radio', 'Выберите тип обложки', 250, 123),
-                'gl_value': ('entry', "Введите значение в мм для направляющих", 2, 210),
-                'gl_length': ('entry', 'Введите длинну направляющих в мм', 2, 251),
-                'cover_canal': ('combo', "Выберите 'канал' обложки", 250, 210),
-                'page_canal': ('combo', "Выберите 'канал' разворотов", 250, 251),
-                'dc_overlap': ('entry', 'НАХЛЕСТ для переплета в мм', 250, 210),
-                'dc_top_indent': ('entry', 'Введите значение отступа СВЕРХУ в мм', 250, 251),
-                'dc_left_indent': ('entry', 'Введите значение отступа СЛЕВА в мм', 250, 291)
+    __FRAMES = {'segment': ('combo', 'Выберите сегмент продукции', 4, 41),
+                'short_name': ('combo', 'Выберите короткое имя', 4, 82),
+                'book_format': ('combo', 'Выберите формат книги', 4, 123),
+                'book_option': ('radio', 'Выберите опции сборки книги', 4, 164),
+                'lamination': ('radio', 'Выберите ламинацию для продукта', 4, 205),
+                'cover_print_mat': ('combo', 'Выберите печатный материал обложки', 256, 41),
+                'cover_carton': ('combo', 'Выберите картонку для обложки', 256, 82),
+                'page_print_mat': ('combo', 'Выберите печатный материал разворотов', 256, 123),
+                'dc_break': ('check', 'Раскодировка с дублированием', 270, 221),
+                'book_type': ('radio', 'Выберите тип обложки', 256, 164),
+                'gl_value': ('entry', "Введите значение в мм для направляющих", 4, 251),
+                'gl_length': ('entry', 'Введите длинну направляющих в мм', 4, 292),
+                'cover_canal': ('combo', "Выберите 'канал' обложки", 256, 251),
+                'page_canal': ('combo', "Выберите 'канал' разворотов", 256, 292),
+                'dc_overlap': ('entry', 'НАХЛЕСТ для переплета в мм', 256, 251),
+                'dc_top_indent': ('entry', 'Введите значение отступа СВЕРХУ в мм', 256, 292),
+                'dc_left_indent': ('entry', 'Введите значение отступа СЛЕВА в мм', 256, 333)
                 }
 
     def __init__(self, parent_root):
@@ -437,7 +438,7 @@ class LibraryWindow(ChildWindow):
         frame = tk.Frame(self, width=500, height=51)
         label = tk.Label(frame, text='Выберите категорию')
         label.place(x=200, y=1)
-        self.category_combobox = ttk.Combobox(frame, state="readonly", width=40, values=Lib.Product.product_type())
+        self.category_combobox = ttk.Combobox(frame, state="readonly", width=40, values=Lib.Product.RUS_NAMES)
         self.category_combobox.bind('<<ComboboxSelected>>', cb_bind_func)
         self.category_combobox.place(x=130, y=25)
         separator = tk.Canvas(frame, width=496, height=1, bg='black')
@@ -458,7 +459,7 @@ class LibraryWindow(ChildWindow):
 
     def show_product_menus(self):
         """Функция для отрисовки фрейма менюшек выбора значений"""
-        self.product_menus_frame = tk.Frame(self, width=500, height=330)
+        self.product_menus_frame = tk.Frame(self, width=500, height=380)
         self.product_menus_frame.pack()
 
     def show_buttons(self, text, command):
@@ -473,12 +474,12 @@ class LibraryWindow(ChildWindow):
         for widget in self.product_menus_frame.winfo_children():
             widget.destroy()
 
-    def __show_entry_frame(self, text, txt_var_name, x, y):
+    def __show_entry_frame(self, text, txt_var_name, x, y, width=39):
         """Конструктор фрейма для отрисовки Entry виджета"""
-        text_label = tk.Label(self.product_menus_frame, text=text)
+        text_label = ttk.Label(self.product_menus_frame, text=text)
         text_label.place(x=x, y=y)
         self.__dict__[txt_var_name] = tk.StringVar(self.product_menus_frame)
-        entry = tk.Entry(self.product_menus_frame, width=39, textvariable=self.__dict__[txt_var_name])
+        entry = ttk.Entry(self.product_menus_frame, width=width, textvariable=self.__dict__[txt_var_name])
         entry.place(x=x, y=y + 20)
 
     def __show_combobox_frame(self, text, cb_var, cb_val, x, y):
@@ -491,7 +492,6 @@ class LibraryWindow(ChildWindow):
     def __show_check_frame(self, text, var, x, y):
         """Конструктор для отрисовки чек фреймов"""
         self.__dict__[var] = tk.BooleanVar(self.product_menus_frame)
-        self.__dict__[var].set(True)
         check_btn = tk.Checkbutton(self.product_menus_frame, text=text, variable=self.__dict__[var])
         check_btn.place(x=x, y=y)
 
@@ -502,7 +502,7 @@ class LibraryWindow(ChildWindow):
         self.__dict__[radio_var] = tk.StringVar(self.product_menus_frame, value=radio_val[0])
         indents = ((0, 20), (50, 20), (100, 20))
         if radio_var == '_book_type':
-            indents = ((0, 20), (0, 40), (80, 20), (80, 40))
+            indents = ((0, 20), (0, 40), (80, 20), (80, 40), (0, 60))
         for i, name in enumerate(radio_val):
             i_x, i_y = indents[i]
             x_pos, y_pos = x + i_x, y + i_y
@@ -512,23 +512,23 @@ class LibraryWindow(ChildWindow):
     def init_menu_lines(self):
         """Отображает менюшки на self.product_menus_frame согласно выбранному продукту"""
         setattr(self, '_product_name', None)
-        self.__show_entry_frame('Введите полное имя продукта', '_product_name', 2, 0)
-        book_type = self.category_combobox.get()
-        for key in self.product_description:
-            frame = self.__FRAMES.get(key)
+        self.__show_entry_frame('Введите полное имя продукта', '_product_name', 4, 0, 81)
+        for key in self.product_description.keys():
+            if key == 'category':
+                continue
             var = f'_{key}'
-            tip, text, x, y = frame
+            tip, text, x, y = self.__FRAMES.get(key)
             setattr(self, var, None)
             if tip == 'entry':
                 self.__show_entry_frame(text, var, x, y)
             if tip == 'combo':
-                self.__show_combobox_frame(text, var, getattr(Lib.Product, key)(), x, y)
+                self.__show_combobox_frame(text, var, getattr(Lib.Product, key.upper()), x, y)
             if tip == 'check':
                 self.__show_check_frame(text, var, x, y)
             if tip == 'radio':
-                self.__show_radio_frame(text, var, getattr(Lib.Product, key)(book_type), x, y)
+                self.__show_radio_frame(text, var, getattr(Lib.Product, key)(self.category_combobox.get()), x, y)
         separator = tk.Canvas(self.product_menus_frame, width=496, height=1, bg='black')
-        separator.place(x=0, y=207)
+        separator.place(x=0, y=248)
 
     def get_values_from_menus(self):
         """Получение введенных значений"""
@@ -536,14 +536,17 @@ class LibraryWindow(ChildWindow):
         if not category:
             return
         full_name = getattr(self, '_product_name').get()
-        values = {'category': category}
+        values = {}
         for key in self.product_description:
+            if key == 'category':
+                values[key] = self.product_description[key]
+                continue
             value = self.__dict__[f'_{key}'].get()
             if key in ('gl_value', 'gl_length', 'dc_overlap', 'dc_top_indent', 'dc_left_indent'):
                 value = int(value) if value.isdigit() else 0
             if value or key in ('dc_break', 'gl_value', 'gl_length', 'dc_overlap', 'dc_top_indent', 'dc_left_indent'):
                 values[key] = value
-        if len(values) - 1 != len(self.product_description) or not full_name:
+        if len(values) != len(self.product_description) or not full_name:
             return
         return {full_name: values}
 
@@ -551,14 +554,18 @@ class LibraryWindow(ChildWindow):
         """Установка значений в комбобоксах и энтри на пустые"""
         self.__dict__['_product_name'].set('')
         for key in self.product_description:
-            if self.__FRAMES.get(key)[0] in ('combo', 'entry'):
+            frame = self.__FRAMES.get(key)
+            if frame and frame[0] in ('combo', 'entry'):
                 self.__dict__[f'_{key}'].set('')
 
     def set_values_to_enter_menus(self, name):
         """Установка значений в комбобоксах и энтри на сохраненные"""
         self.__dict__['_product_name'].set(name)
+        self.__dict__['children']['!frame3'].__dict__['children']['!entry'].config(state='readonly')
         product_dict = self.parent_root.O_LIBRARY[name]
         for key in self.product_description:
+            if key == 'category':
+                continue
             self.__dict__[f'_{key}'].set(product_dict[key])
 
     def save_library(self):
@@ -585,8 +592,8 @@ class AddToLibWindow(LibraryWindow):
         dct = self.get_values_from_menus()
         if dct:
             self.parent_root.O_LIBRARY.update(dct)
-            self.clear_menus_entered_values()
             self.save_library()
+            self.clear_menus_entered_values()
             tkmb.showinfo(title='Добавление продукта', message='Продукт успешно добавлен в библиотеку')
 
 
@@ -603,7 +610,7 @@ class ChangeLibWindow(LibraryWindow):
 
     def category_event(self, event):
         self.names_combobox.set('')
-        category = self.category_combobox.get()
+        category = Lib.Product.CATEGORY[Lib.Product.RUS_NAMES.index(self.category_combobox.get())]
         names = tuple(k for k, v in self.parent_root.O_LIBRARY.items() if v['category'] == category)
         self.names_combobox.config(values=names)
         self.product_menus_frame_clearing()
@@ -638,7 +645,7 @@ class DeleteFromLibWindow(LibraryWindow):
 
     def category_event(self, event=None):
         self.names_combobox.set('')
-        category = self.category_combobox.get()
+        category = Lib.Product.CATEGORY[Lib.Product.RUS_NAMES.index(self.category_combobox.get())]
         names = tuple(k for k, v in self.parent_root.O_LIBRARY.items() if v['category'] == category)
         self.names_combobox.config(values=names)
 
@@ -732,14 +739,15 @@ class ProcessingWindow(ChildWindow):
         pass
 
     def show_main_frame(self):
-        """АФ отрисовки основного виджета дочернего обработчика"""
+        """Абстрактная функция отрисовки основного виджета дочернего обработчика"""
         pass
 
     def get_order_settings(self):
-        """АФ для получения словаря значений переменых в дочерних классах"""
+        """Абстрактная функция для получения словаря значений переменых в дочерних классах"""
         pass
 
     def __main(self):
+        """Инициализация виджетов"""
         self.config(border=1, relief='solid')
         self.order_name_entry_widget()
         self.order_name_label = ttk.Label(master=self, text='Для запуска обработчика введите номер заказа')
@@ -751,6 +759,7 @@ class ProcessingWindow(ChildWindow):
         self.bind('<Control-Return>', self.init_proc)
 
     def order_name_entry_widget(self):
+        """Функция отрисовки виджета ввода номера заказа"""
         frame = tk.Frame(master=self, width=300, height=30)
         label = ttk.Label(master=frame, text='Введите номер заказа:')
         label.place(x=20, y=4)
@@ -766,6 +775,7 @@ class ProcessingWindow(ChildWindow):
         frame.pack()
 
     def get_order_dict(self, event=None):
+        """Функция проверки корректности введеного номера заказа и получение его значения из БД"""
         order_name = self.order_name_entry_var.get()
         self.order_exist = None
         if re.fullmatch(r'\d{6}', order_name):
@@ -781,6 +791,7 @@ class ProcessingWindow(ChildWindow):
         self.reset_settings_to_default()
 
     def buttons_frame(self):
+        """Функция отрисовки основных кнопок"""
         frame = tk.Frame(master=self, width=300, height=33)
         canvas = tk.Canvas(master=frame, width=296, height=1, bg='black')
         canvas.place(x=0, y=0)
@@ -791,12 +802,14 @@ class ProcessingWindow(ChildWindow):
         frame.pack()
 
     def stop_func(self):
+        """Функция остановки процесса обработки"""
         try:
             self.destroy()
         except:
             pass
 
     def show_progress_widget(self):
+        """Функция отрисовки виджетов прогресс бара и текстовых виджетов"""
         for name in self.winfo_children():
             name.destroy()
         self.geometry('300x105')
@@ -810,6 +823,7 @@ class ProcessingWindow(ChildWindow):
         self.close_button.place(x=221, y=75)
 
     def init_proc(self, event=None):
+        """Инициализация обработки с выводом информации на экран"""
         if not self.order_exist or not self.event_flag:
             return
         self.event_flag = False
@@ -847,6 +861,7 @@ class SmartProcWindow(ProcessingWindow):
         self.wait_window()
 
     def type_line_widget(self, book_type, text, frame_height, check_option):
+        """Конструктор для полей, которые отображают тип обработки"""
         self.settings_dict[book_type] = {}
         frame = tk.Frame(master=self, width=300, height=frame_height)
         label = ttk.Label(master=frame, text=text)
@@ -869,6 +884,7 @@ class SmartProcWindow(ProcessingWindow):
         frame.pack()
 
     def show_undetected_edition_frame(self):
+        """Отрисовка фрейма нераспознанных тиражей"""
         self.settings_dict['undetected'] = {}
         label = ttk.Label(self, text='Список нераспознанных тиражей')
         label.pack()
@@ -877,6 +893,7 @@ class SmartProcWindow(ProcessingWindow):
         self.settings_dict['undetected'].update({'label': label, 'combobox': combobox})
 
     def disable_info_widgets(self):
+        """Перевод всех фреймов в неактивное положение"""
         for vals in self.settings_dict.values():
             vals['label'].config(state=tk.DISABLED)
             vals['combobox'].config(state=tk.DISABLED)
@@ -888,6 +905,7 @@ class SmartProcWindow(ProcessingWindow):
                     var.set(False)
 
     def enable_info_widgets(self, order_dct):
+        """Перевод фреймов в активное положение, согласно типам продукта в заказе"""
         for key, value in order_dct.items():
             widgets = self.settings_dict[key]
             widgets['label'].config(state=tk.NORMAL)
@@ -900,6 +918,7 @@ class SmartProcWindow(ProcessingWindow):
                         tup[1].set(True)
 
     def show_main_frame(self):
+        """Отрисовка основных виджетов"""
         self.type_line_widget('fotobook', 'Книги на Фотобумаге -- Раскидывание по каналам', 100,
                               (('stroke', 'Обводка'), ('rename', 'Переименование'), ('guideline', 'Направляющие'),
                                ('add backprint', 'Добавить Бек-Принт'), ('generate .mrk', 'Сформировать .mrk')))

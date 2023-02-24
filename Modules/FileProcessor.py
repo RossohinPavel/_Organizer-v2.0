@@ -46,30 +46,30 @@ class OrderBuckup:
             for file in files:
                 catalog = os.path.relpath(f'{root}', path)
                 self.dir_list.add(catalog)
-                file_list.append((catalog, file))
-        self.file_list.append(tuple(file_list))
+                file_list.append((catalog, catalog, file))
+        self.file_list.append(file_list)
 
     def __get_ccv_files(self, path, content_name):
         file_list = []
         if content_name != 'PHOTO':
             content_path = f'{path}/{content_name}'
             for catalog in os.listdir(content_path):
-                if catalog in ('Covers', 'Variable', 'Constant'):
-                    self.dir_list.add(f'{content_name}/{catalog}')
-                if catalog == 'Covers':
-                    for name in os.listdir(f'{content_path}/{catalog}'):
-                        file_list.append((f'{content_name}/{catalog}', name))
                 if catalog in ('Constant', 'Variable'):
+                    working_dir = f'{content_name}/{catalog}'
                     for name in os.listdir(f'{content_path}/{catalog}'):
                         if re.fullmatch(r'\d{3}_(?:_\d{3}|\d{,3}_pcs)\.jpg', name):
-                            file_list.append((f'{content_name}/{catalog}', name))
+                            self.dir_list.add(working_dir)
+                            file_list.append((working_dir, working_dir, name))
+                        if re.fullmatch(r'cover_(?:\d{3}|\d{,3}_pcs)\.jpg', name):
+                            self.dir_list.add(f'{content_name}/Covers')
+                            file_list.append((working_dir, f'{content_name}/Covers', name))
         else:
             for root, dirs, files in os.walk(f'{path}/{content_name}/_ALL'):
                 for file in files:
                     catalog = os.path.relpath(root, path)
                     self.dir_list.add(catalog)
-                    file_list.append((catalog, file))
-        self.file_list.append(tuple(file_list))
+                    file_list.append((catalog, catalog, file))
+        self.file_list.append(file_list)
 
     def __get_ex_files(self, path, content_name):
         file_list = []
@@ -77,10 +77,11 @@ class OrderBuckup:
             content_path = f'{path}/{content_name}'
             for ex in os.listdir(content_path):
                 if re.fullmatch(r'\d{3}(-\d{,3}_pcs)?', ex):
-                    self.dir_list.add(f'{content_name}/{ex}')
+                    working_dir = f'{content_name}/{ex}'
+                    self.dir_list.add(working_dir)
                     for file in os.listdir(f'{content_path}/{ex}'):
                         if re.fullmatch(r'(?:\d{3}_|cover)_\d{3}(-\d{,3}_pcs)?\.jpg', file):
-                            file_list.append((f'{content_name}/{ex}', file))
+                            file_list.append((working_dir, working_dir, file))
         else:
             for name in os.listdir(f'{path}/{content_name}'):
                 if name != '_ALL':
@@ -88,8 +89,8 @@ class OrderBuckup:
                         for file in files:
                             catalog = os.path.relpath(root, path)
                             self.dir_list.add(catalog)
-                            file_list.append((catalog, file))
-        self.file_list.append(tuple(file_list))
+                            file_list.append((catalog, catalog, file))
+        self.file_list.append(file_list)
 
     def get_file_len(self) -> int:
         return sum(len(x) for x in self.file_list)
@@ -103,26 +104,25 @@ class OrderBuckup:
         src = f'{self.path}/{self.order_name}'
         contents_len = len(self.contents)
         for i, v in enumerate(self.contents):
-            for f_path, f_name in self.file_list[i]:
+            for f_src, f_dst, f_name in self.file_list[i]:
                 yield self.order_name, f'{contents_len}/{i+1} -- {v}', f_name
-                shutil.copy2(f'{src}/{f_path}/{f_name}', f'{src}/_TO_PRINT/{f_path}/{f_name}')
+                shutil.copy2(f'{src}/{f_src}/{f_name}', f'{src}/_TO_PRINT/{f_dst}/{f_name}')
 
 
 class OrderSmartProcessor:
     __slots__ = 'object_list', 'order_name'
 
     def __init__(self, order_dict, library, common_stg):
+        print(order_dict)
         self.order_name = order_dict['NAME']
         self.object_list = tuple(self.__get_object_list(order_dict, library, common_stg))
-        print(self.object_list)
 
 
     @staticmethod
     def __get_object_list(order_dict, library, common_stg):
-        common_stg = {k: v for k, v in common_stg.items() if k in ('stroke_size', 'stroke_color',
-                                                                   'guideline_size', 'guideline_color')}
+        common_stg = {k: common_stg[k] for k in ('stroke_size', 'stroke_color', 'guideline_size', 'guideline_color')}
         for key, value in order_dict['CONTENTS'].items():
-            edition_type = value[1]
+            counts, edition_type = value
             if edition_type is None or edition_type[1] == 'PHOTO':
                 continue
             book_type, edition_type = edition_type

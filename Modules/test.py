@@ -1,5 +1,7 @@
 import pickle
+import os
 
 
-with open('../Configs/settings.pcl', 'rb') as file:
-    print(pickle.load(file))
+for log in os.listdir('../Logs'):
+    with open(f'../Logs/{log}', 'rb') as file:
+        print(pickle.load(file))
