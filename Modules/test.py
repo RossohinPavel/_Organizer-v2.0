@@ -1,7 +1,7 @@
-import pickle
-import os
 
 
-for log in os.listdir('../Logs'):
-    with open(f'../Logs/{log}', 'rb') as file:
-        print(pickle.load(file))
+
+main_dct = {'1': 1, '2': {'21': 21, '22': 22}}
+children = main_dct['2']
+children.update({'23': 23})
+print(main_dct)

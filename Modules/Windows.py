@@ -431,6 +431,7 @@ class LibraryWindow(ChildWindow):
         self.category_combobox = None  # Для отрисовки комбобокса категорий и сохранения его значений
         self.names_combobox = None  # Для отрисовки комбобокса с сохраненными именами продуктов
         self.product_menus_frame = None  # Фрейм, на котором рисуются менюшки с выбором
+        self.product_name_entry = None
         self.resizable(False, False)
 
     def show_category_frame(self, cb_bind_func):
@@ -561,7 +562,6 @@ class LibraryWindow(ChildWindow):
     def set_values_to_enter_menus(self, name):
         """Установка значений в комбобоксах и энтри на сохраненные"""
         self.__dict__['_product_name'].set(name)
-        self.__dict__['children']['!frame3'].__dict__['children']['!entry'].config(state='readonly')
         product_dict = self.parent_root.O_LIBRARY[name]
         for key in self.product_description:
             if key == 'category':
@@ -626,10 +626,11 @@ class ChangeLibWindow(LibraryWindow):
     def change_button(self):
         dct = self.get_values_from_menus()
         if dct:
+            self.parent_root.O_LIBRARY.pop(self.names_combobox.get())
             self.parent_root.O_LIBRARY.update(dct)
             self.clear_menus_entered_values()
             self.save_library()
-            self.names_combobox.set('')
+            self.category_event(None)
             tkmb.showinfo(title='Изменение продукта', message='Значения продукта успешно обновлены')
 
 
@@ -834,9 +835,10 @@ class ProcessingWindow(ChildWindow):
         if type(self) == BackUpWindow:
             order_obj = FileProc.OrderBuckup(self.order_exist)
         if type(self) == SmartProcWindow:
-            order_obj = FileProc.OrderSmartProcessor(self.order_exist, self.parent_root.O_LIBRARY,
-                                                     self.parent_root.O_SETTINGS)
-            return
+            if not self.order_exist['CONTENTS']:
+                self.destroy()
+                return
+            order_obj = FileProc.OrderSmartProcessor(self.order_exist)
         order_obj.get_file_list()
         total_count = order_obj.get_file_len()
         counter = 0
@@ -844,6 +846,7 @@ class ProcessingWindow(ChildWindow):
         self.processing_pb['value'] = 0
         self.processing_info.config(text='Создаю каталоги')
         order_obj.make_dirs()
+        return
         self.update()
         for order, content, file in order_obj.processing_run():
             counter += 1
@@ -917,7 +920,6 @@ class SmartProcWindow(ProcessingWindow):
                     if key == 'photobook' and name in ('stroke', 'guideline', 'generate .mrk') or key in ('layflat', 'album'):
                         tup[1].set(True)
 
-
     def show_main_frame(self):
         """Отрисовка основных виджетов"""
         self.type_line_widget('photobook', 'Книги на Фотобумаге -- Раскидывание по каналам', 100,
@@ -951,11 +953,23 @@ class SmartProcWindow(ProcessingWindow):
         self.enable_info_widgets(book_dict)
 
     def get_order_settings(self):
-        order_settings = {}
-        for key, value in self.settings_dict.items():
-            if key in ('fotobook', 'polibook', 'albums'):
-                order_settings[key] = {k: v[1].get() for k, v in value['checkbutton'].items()}
-        self.order_exist['TYPE'] = order_settings
+        edition_to_print = {}
+        processing_settings = {}
+        for key, value in self.order_exist.pop('CONTENTS').items():
+            if value[1] is None or value[1] == 'PHOTO':
+                continue
+            lib = self.parent_root.O_LIBRARY[value[1]].copy()
+            lib_cat = lib['category']
+            if lib_cat in ('photobook', 'layflat', 'journal', 'album', 'photocanvas'):
+                edition_to_print[key] = lib
+                edition_to_print[key].update({'combination': value[0][-1]})
+            if lib_cat in ('photobook', 'layflat', 'album'):
+                stg = {k: v[1].get() for k, v in self.settings_dict[lib_cat]['checkbutton'].items()}
+                common = ('stroke_size', 'stroke_color', 'guideline_size', 'guideline_color')
+                stg.update({k: self.parent_root.O_SETTINGS[k] for k in common})
+                processing_settings[lib_cat] = stg
+        self.order_exist['CONTENTS'] = edition_to_print
+        self.order_exist['PROC_STG'] = processing_settings
 
 
 class BackUpWindow(ProcessingWindow):

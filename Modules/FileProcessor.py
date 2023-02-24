@@ -112,69 +112,102 @@ class OrderBuckup:
 class OrderSmartProcessor:
     __slots__ = 'object_list', 'order_name'
 
-    def __init__(self, order_dict, library, common_stg):
-        print(order_dict)
+    def __init__(self, order_dict):
         self.order_name = order_dict['NAME']
-        self.object_list = tuple(self.__get_object_list(order_dict, library, common_stg))
-
+        self.object_list = self.get_obj_list(order_dict)
 
     @staticmethod
-    def __get_object_list(order_dict, library, common_stg):
-        common_stg = {k: common_stg[k] for k in ('stroke_size', 'stroke_color', 'guideline_size', 'guideline_color')}
-        for key, value in order_dict['CONTENTS'].items():
-            counts, edition_type = value
-            if edition_type is None or edition_type[1] == 'PHOTO':
-                continue
-            book_type, edition_type = edition_type
-            obj, proc_stg = None, None
-            if edition_type in ('Фотокнига Премиум', 'Фотокнига выпускника'):
-                obj = FotobookEdition
-                proc_stg = order_dict['TYPE']['fotobook']
-            if edition_type in ('Фотокнига Flex Bind', 'Альбом и PUR'):
-                obj = AlbumEdition
-                proc_stg = order_dict['TYPE']['albums']
-            if edition_type == 'Layflat':
-                obj = PolibookEdition
-                proc_stg = order_dict['TYPE']['polibook']
-            if edition_type == 'Фотожурнал':
-                obj = JournalEdition
-                proc_stg = {}
-            path = f'{order_dict["PATH"]}/{order_dict["NAME"]}'
-            file_stg = library[book_type]
-            file_stg.update(common_stg)
-            yield obj(path, key, proc_stg, file_stg)
+    def get_obj_list(order_dict: dict) -> list:
+        lst = []
+        path = f'{order_dict["PATH"]}/{order_dict["NAME"]}'
+        for content, value in order_dict['CONTENTS'].items():
+            if value['category'] == 'photobook':
+                lst.append(FotobookEdition(path, content, value, order_dict['PROC_STG']['photobook']))
+            if value['category'] == 'layflat':
+                lst.append(PolibookEdition(path, content, value, order_dict['PROC_STG']['layflat']))
+            if value['category'] == 'album':
+                lst.append(AlbumEdition(path, content, value, order_dict['PROC_STG']['album']))
+            if value['category'] == 'journal':
+                lst.append(JournalEdition(path, content, value))
+            if value['category'] == 'photocanvas':
+                lst.append(CanvasEdition(path, content, value))
+        return lst
+
+    def get_file_list(self):
+        for obj in self.object_list:
+            obj.get_file_list()
+
+    def get_file_len(self):
+        return sum(obj.get_file_len() for obj in self.object_list)
+
+    def make_dirs(self):
+        for path in set(y for x in self.object_list for y in x.get_new_dirs()):
+            os.makedirs(path, exist_ok=True)
+
+    def processing_run(self):
+        pass
 
 
 class Edition:
-    __slots__ = 'path', 'name', 'proc_stg', 'file_stg'
+    __slots__ = 'path', 'name', 'file_stg', 'proc_stg', 'cover_list', 'pages_list'
 
-    def __init__(self, path, name, proc_stg, file_stg):
+    def __init__(self, path, name, file_stg, proc_stg=None):
         self.path = path
         self.name = name
-        self.proc_stg = proc_stg
         self.file_stg = file_stg
+        self.proc_stg = proc_stg
+        self.cover_list = None
+        self.pages_list = None
+
+    def get_file_list(self):
+        pass
+
+    def get_file_len(self):
+        return 0
+
+    def get_new_dirs(self):
+        return []
+
+    def get_covers(self):
+        path = f'{self.path}/{self.name}'
+        for catalog in os.listdir(path):
+            if catalog in ('Constant', 'Variable'):
+                for file in os.listdir(f'{path}/{catalog}'):
+                    if re.fullmatch(r'cover_(?:\d{3}|\d{,3}_pcs|\d{3}-\d{,3}_pcs)\.jpg', file):
+                        yield f'{path}/{catalog}', file
 
 
 class FotobookEdition(Edition):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    pass
 
 
 class PolibookEdition(Edition):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    pass
 
 
 class AlbumEdition(Edition):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    pass
 
 
 class JournalEdition(Edition):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    pass
 
 
 class CanvasEdition(Edition):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+
+    def get_file_list(self):
+        self.cover_list = tuple(self.get_covers())
+
+    def get_file_len(self):
+        counter = 0
+        for path, name in self.cover_list:
+            if re.fullmatch(r'cover_\d{3}\.jpg', name):
+                counter += 1
+            if re.fullmatch(r'cover_\d{,3}_pcs\.jpg', name):
+                counter += int(name.split('_')[1])
+            if re.fullmatch(r'cover_\d{3}-\d{,3}_pcs\.jpg', name):
+                counter += int(re.split(r'[-_]', name)[2])
+        return counter
+
+    def get_new_dirs(self):
+        return f'{self.path}/_TO_PRINT',
