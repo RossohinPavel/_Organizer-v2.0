@@ -914,19 +914,21 @@ class SmartProcWindow(ProcessingWindow):
             if cbuns:
                 for name, tup in cbuns.items():
                     tup[0].config(state=tk.NORMAL)
-                    if key == 'fotobook' and name in ('stroke', 'guideline', 'generate .mrk') or key in ('polibook', 'albums'):
+                    if key == 'photobook' and name in ('stroke', 'guideline', 'generate .mrk') or key in ('layflat', 'album'):
                         tup[1].set(True)
+
 
     def show_main_frame(self):
         """Отрисовка основных виджетов"""
-        self.type_line_widget('fotobook', 'Книги на Фотобумаге -- Раскидывание по каналам', 100,
+        self.type_line_widget('photobook', 'Книги на Фотобумаге -- Раскидывание по каналам', 100,
                               (('stroke', 'Обводка'), ('rename', 'Переименование'), ('guideline', 'Направляющие'),
                                ('add backprint', 'Добавить Бек-Принт'), ('generate .mrk', 'Сформировать .mrk')))
-        self.type_line_widget('polibook', "Layflat'ы -- Извлечение Спец-Папок", 61,
+        self.type_line_widget('layflat', "Layflat'ы -- Извлечение Спец-Папок", 61,
                               (('guideline', 'Направляющие'), ('rename', 'Переименование')))
-        self.type_line_widget('albums', "Альбомы, PUR, FlexBind'ы -- Раскодировка", 61,
+        self.type_line_widget('album', "Альбомы, PUR, FlexBind'ы -- Раскодировка", 61,
                               (('guideline', 'Направляющие'), ('rename', 'Переименование')))
-        self.type_line_widget('journals', 'Журналы -- Раскодировка', 41, None)
+        self.type_line_widget('journal', 'Журналы -- Раскодировка', 41, None)
+        self.type_line_widget('photocanvas', 'Холсты -- Подготовка к печати', 41, None)
         self.show_undetected_edition_frame()
         self.disable_info_widgets()
 
@@ -935,17 +937,17 @@ class SmartProcWindow(ProcessingWindow):
         self.disable_info_widgets()
         if not self.order_exist:
             return
-        combination = {"Фотокнига Премиум": 'fotobook', "Фотокнига выпускника": 'fotobook', 'Layflat': 'polibook',
-                       'Фотокнига Flex Bind': 'albums', 'Альбом и PUR': 'albums', 'Фотожурнал': 'journals'}
         book_dict = {}
         for name, values in self.order_exist['CONTENTS'].items():
             book_type = values[1]
-            if book_type is not None:
-                book_type = book_type[1]
-            if book_type in combination:
-                book_dict.setdefault(combination[book_type], []).append(name)
-            if book_type not in combination and book_type != 'PHOTO':
+            if book_type == 'PHOTO':
+                continue
+            if book_type is None:
                 book_dict.setdefault('undetected', []).append(name)
+            if book_type:
+                lib_cat = self.parent_root.O_LIBRARY[book_type]['category']
+                if lib_cat in ('photobook', 'layflat', 'journal', 'album', 'photocanvas'):
+                    book_dict.setdefault(lib_cat, []).append(name)
         self.enable_info_widgets(book_dict)
 
     def get_order_settings(self):

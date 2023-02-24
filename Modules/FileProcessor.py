@@ -173,3 +173,8 @@ class AlbumEdition(Edition):
 class JournalEdition(Edition):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+
+class CanvasEdition(Edition):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)

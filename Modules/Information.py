@@ -9,11 +9,11 @@ class StickerInfo:
     def forming_line(self, name, counts, types) -> tuple:
         if types is None:
             return 'body', name
-        suff_types = {'PHOTO': lambda: '+фото', 'photocanvas': lambda: '+холсты',
-                      'SRAprint': lambda: '+полигр фото', 'sub': lambda: self.lib_dict[types]['short_name']}
-        if types in suff_types:
-            return 'suff', suff_types[types]()
+        if types == 'PHOTO':
+            return 'suff', '+фото'
         lib = self.lib_dict[types]
+        if lib['category'] in ('photocanvas', 'SRAprint', 'sub'):
+            return 'suff', lib['short_name']
         info = (lib['short_name'],
                 lib['book_format'] if lib['short_name'] not in ("кМикс", "пМикс", "Дуо", "Дуо гор", "Трио") else '',
                 counts[2], lib.get('book_option', ''), lib.get('lamination', ''),
