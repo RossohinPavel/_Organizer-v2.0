@@ -846,7 +846,6 @@ class ProcessingWindow(ChildWindow):
         self.processing_pb['value'] = 0
         self.processing_info.config(text='Создаю каталоги')
         order_obj.make_dirs()
-        return
         self.update()
         for order, content, file in order_obj.processing_run():
             counter += 1
@@ -917,8 +916,13 @@ class SmartProcWindow(ProcessingWindow):
             if cbuns:
                 for name, tup in cbuns.items():
                     tup[0].config(state=tk.NORMAL)
-                    if key == 'photobook' and name in ('stroke', 'guideline', 'generate .mrk') or key in ('layflat', 'album'):
+                    if key == 'photobook' and name in ('stroke', 'guideline', 'generate .mrk'):
                         tup[1].set(True)
+                    if key == 'layflat' and name == 'guideline':
+                        tup[1].set(True)
+                    if key == 'album':
+                        tup[1].set(True)
+
 
     def show_main_frame(self):
         """Отрисовка основных виджетов"""
