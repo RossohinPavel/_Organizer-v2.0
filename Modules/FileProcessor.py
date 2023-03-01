@@ -1,6 +1,7 @@
 import shutil
 import os
 import re
+import time
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -268,34 +269,38 @@ class Edition:
     @staticmethod
     def journal_decoding(file_list, dst_p):
         file_list_len = len(file_list)
-        if file_list_len % 2 == 0:
-            even_count = file_list_len - 2
-            uneven_count = 1
-            *pages, cover = file_list
-            yield cover[-1]
-            shutil.copy2(f'{cover[0]}/{cover[-1]}', f'{dst_p}/br000.jpg')
-            for src_p, page in pages:
-                yield page
-                l_index = pages.index((src_p, page))
-                r_index = - 1 - l_index
-                with Image.open(f'{src_p}/{pages[l_index][-1]}') as l_image:
-                    l_image.load()
-                len_x = int(l_image.width / 2)
-                len_y = l_image.height
-                l_image_crop = l_image.crop((0, 0, len_x, len_y))
-                l_image.close()
-                with Image.open(f'{src_p}/{pages[r_index][-1]}') as r_image:
-                    r_image.load()
-                r_image.paste(l_image_crop)
-                if pages[l_index] <= pages[r_index]:
-                    file_name = f'br{str(uneven_count).rjust(3, "0")}.jpg'
-                    uneven_count += 2
-                else:
-                    file_name = f'br{str(even_count).rjust(3, "0")}.jpg'
-                    even_count -= 2
-                r_image.save(f'{dst_p}/{file_name}', quality='keep', dpi=(300, 300))
-        else:
-            yield []
+        if not len(file_list) % 2 == 0:
+            return
+        count = 0
+        yield f'br{str(count).rjust(3, "0")}.jpg'
+        shutil.copy2(f'{file_list[-1][0]}/{file_list[-1][-1]}', f'{dst_p}/br{str(count).rjust(3, "0")}.jpg')
+        count += 1
+        for i in range((file_list_len-1) // 2):
+            uneven_spread = file_list[i]
+            even_spread = file_list[file_list_len-2-i]
+            with Image.open(f'{uneven_spread[0]}/{uneven_spread[1]}') as uneven_spread:
+                uneven_spread.load()
+            with Image.open(f'{even_spread[0]}/{even_spread[1]}') as even_spread:
+                even_spread.load()
+            uneven_spread_crop = uneven_spread.crop((0, 0, uneven_spread.width // 2, uneven_spread.height))
+            spread_to_save = even_spread.copy()
+            spread_to_save.paste(uneven_spread_crop)
+            yield f'br{str(count).rjust(3, "0")}.jpg'
+            spread_to_save.save(f'{dst_p}/br{str(count).rjust(3, "0")}.jpg', quality=100, dpi=(300, 300))
+            uneven_spread_crop.close()
+            count += 1
+            even_spread_crop = even_spread.crop((0, 0, even_spread.width // 2, even_spread.height))
+            spread_to_save = uneven_spread.copy()
+            spread_to_save.paste(even_spread_crop)
+            yield f'br{str(count).rjust(3, "0")}.jpg'
+            spread_to_save.save(f'{dst_p}/br{str(count).rjust(3, "0")}.jpg', quality=100, dpi=(300, 300))
+            even_spread_crop.close()
+            count += 1
+            even_spread.close()
+            uneven_spread.close()
+        yield f'br{str(count).rjust(3, "0")}.jpg'
+        msi = file_list_len // 2 - 1
+        shutil.copy2(f'{file_list[msi][0]}/{file_list[msi][-1]}', f'{dst_p}/br{str(count).rjust(3, "0")}.jpg')
 
     @staticmethod
     def album_decoding(file_list, ex_name,  dst_p, text, **kwargs):
