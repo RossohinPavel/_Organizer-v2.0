@@ -1,7 +1,6 @@
 import shutil
 import os
 import re
-import time
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -303,34 +302,82 @@ class Edition:
         shutil.copy2(f'{file_list[msi][0]}/{file_list[msi][-1]}', f'{dst_p}/br{str(count).rjust(3, "0")}.jpg')
 
     @staticmethod
-    def album_decoding(file_list, ex_name,  dst_p, text, **kwargs):
+    def album_decoding(file_list, dst_p, text, **kwargs):
         pages_count = 1
-        image_to_meas = file_list[0]
-        with Image.open(f'{image_to_meas[0]}/{image_to_meas[1]}') as image_to_meas:
-            image_to_meas.load()
-        len_x, len_y = image_to_meas.width, image_to_meas.height
-        len_x_even = int(len_x / 2) + Edition.mm_to_pixel(kwargs['dc_overlap'])
-        len_x_uneven = int(len_x / 2) - Edition.mm_to_pixel(kwargs['dc_overlap'])
-        image_to_meas.close()
-        top_indent = Edition.mm_to_pixel(kwargs['dc_top_indent'])
-        left_indent = Edition.mm_to_pixel(kwargs['dc_left_indent'])
-        white_image = Image.new('RGB', (len_x_even + left_indent, len_y + top_indent), 'white')
+        white_image = Image.new('RGB', (2400, 2400), 'white')
         top_white_image = white_image.copy()
         draw_text = ImageDraw.Draw(top_white_image)
         draw_text.text((235, 2125), text=text, fill="#9a9a9a", font=ImageFont.truetype("arial.ttf", 80))
-        top_white_image.save(f'{dst_p}/{ex_name}__page{pages_count}.jpg', quality=100, dpi=(300, 300))
-        # pages_count += 1
-        # for name in file_list:
-        #     with Image.open(f'{ex_src}/{name}') as page_image:
-        #         page_image.load()
-        #     l_side = page_image.crop((0, 0, len_x_even, len_y))
-        #     r_side = page_image.crop((len_x_uneven, 0, len_x, len_y))
-        #     l_side.save(f'{ex_dest}/{ex}__page{pages_count}.jpg', quality=100, dpi=(300, 300))
-        #     pages_count += 1
-        #     r_side.save(f'{ex_dest}/{ex}__page{pages_count}.jpg', quality=100, dpi=(300, 300))
-        #     pages_count += 1
-        # white_image.save(f'{ex_dest}/{ex}__page{pages_count}.jpg', quality=100, dpi=(300, 300))
-        yield []
+        top_white_image.save(f'{dst_p}/page{pages_count}.jpg', quality=100, dpi=(300, 300))
+        top_white_image.close()
+        overlap = Edition.mm_to_pixel(kwargs['dc_overlap'])
+        top_ind = Edition.mm_to_pixel(kwargs['dc_top_indent'])
+        left_ind = Edition.mm_to_pixel(kwargs['dc_left_indent'])
+        for path, page in file_list:
+            yield page
+            with Image.open(f'{path}/{page}') as spread_img:
+                spread_img.load()
+            l_side = spread_img.crop((0, 0, spread_img.width // 2 + overlap, spread_img.height))
+            r_side = spread_img.crop((spread_img.width // 2 - overlap, 0, spread_img.width, spread_img.height))
+            spread_img.close()
+            if left_ind > 0 or top_ind > 0:
+                new_l_side = Image.new('RGB', (l_side.width + left_ind, l_side.height + top_ind), 'white')
+                new_l_side.paste(l_side, (0, top_ind))
+                l_side.close()
+                l_side = new_l_side
+                new_r_side = Image.new('RGB', (r_side.width + left_ind, r_side.height + top_ind), 'white')
+                new_r_side.paste(r_side, (left_ind, top_ind))
+                r_side.close()
+                r_side = new_r_side
+            pages_count += 2
+            l_side.save(f'{dst_p}/page{pages_count - 1}.jpg', quality=100, dpi=(300, 300))
+            r_side.save(f'{dst_p}/page{pages_count}.jpg', quality=100, dpi=(300, 300))
+            l_side.close()
+            r_side.close()
+        white_image.save(f'{dst_p}/page{pages_count + 1}.jpg', quality=100, dpi=(300, 300))
+        white_image.close()
+
+    @staticmethod
+    def break_decoding(file_list, dst_p, text, **kwargs):
+        pages_list = []
+        white_image = Image.new('RGB', (2400, 2400), 'white')
+        draw_text = ImageDraw.Draw(white_image)
+        draw_text.text((235, 2125), text=text, fill="#9a9a9a", font=ImageFont.truetype("arial.ttf", 80))
+        pages_list.append(white_image)
+        overlap = Edition.mm_to_pixel(kwargs['dc_overlap'])
+        top_ind = Edition.mm_to_pixel(kwargs['dc_top_indent'])
+        left_ind = Edition.mm_to_pixel(kwargs['dc_left_indent'])
+        for path, page in file_list:
+            yield f'Creating objects {page}'
+            with Image.open(f'{path}/{page}') as spread_img:
+                spread_img.load()
+            l_crop = spread_img.crop((0, 0, spread_img.width // 2 + overlap, spread_img.height))
+            r_crop = spread_img.crop((spread_img.width // 2 - overlap, 0, spread_img.width, spread_img.height))
+            spread_img.close()
+            l_side = Image.new('RGB', (spread_img.width // 2 + left_ind + overlap, spread_img.height + top_ind), 'white')
+            r_side = l_side.copy()
+            l_side.paste(l_crop, (0, top_ind))
+            l_crop.close()
+            pages_list.append(l_side)
+            r_side.paste(r_crop, (left_ind, top_ind))
+            r_crop.close()
+            pages_list.append(r_side)
+        pages_list.append(Image.new('RGB', (2400, 2400), 'white'))
+        yield f'Saving decoded pages'
+        middle = len(pages_list) // 2
+        for i in range(middle):
+            fb_page = Image.new('RGB', (3780, 5398), 'white')
+            top_img, bottom_img = pages_list[i], pages_list[middle + i]
+            if i % 2 == 0:
+                fb_page.paste(top_img, (0, 0))
+                fb_page.paste(bottom_img, (0, 2763))
+            else:
+                fb_page.paste(top_img, (3780 - top_img.width, 0))
+                fb_page.paste(bottom_img, (3780 - top_img.width, 2763))
+            top_img.close()
+            bottom_img.close()
+            fb_page.save(f'{dst_p}/page{i + 1}.jpg', quality=100, dpi=(300, 300))
+            fb_page.close()
 
     @staticmethod
     def mm_to_pixel(value: int) -> int:
@@ -426,7 +473,10 @@ class AlbumEdition(Edition):
             self.variables_list = tuple(self.get_ex_pages())
 
     def get_file_len(self):
-        return len(self.cover_list) + sum(len(x) for x in self.variables_list)
+        file_len = len(self.cover_list) + sum(len(x) for x in self.variables_list)
+        if self.file_stg['dc_break']:
+            file_len += len(self.variables_list)
+        return file_len
 
     def get_new_dirs(self):
         cover_dir = f'{self.path}/_TO_PRINT/{self.name}/Covers',
@@ -455,9 +505,10 @@ class AlbumEdition(Edition):
             new_path = f'{self.path}/_TO_PRINT/{self.name}/{pages_len}{old_name}{copies}'
             text = f'{self.path[-6:]} - {self.name[:20]} - {old_name}'
             if self.file_stg['dc_break']:
-                pass
+                for file in self.break_decoding(ex, new_path, text, **self.file_stg):
+                    yield file
             else:
-                for file in self.album_decoding(ex, old_name, new_path, text, **self.file_stg):
+                for file in self.album_decoding(ex, new_path, text, **self.file_stg):
                     yield file
 
 
