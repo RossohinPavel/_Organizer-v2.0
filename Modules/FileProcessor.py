@@ -157,6 +157,10 @@ class OrderSmartProcessor:
 class Edition:
     __slots__ = 'path', 'name', 'index', 'file_stg', 'proc_stg', 'cover_list', 'constant_list', 'variables_list'
 
+    @staticmethod
+    def mm_to_pixel(value: int) -> int:
+        return int(value * 11.88)
+
     def __init__(self, path, name, index, file_stg, proc_stg=None):
         self.path = path
         self.name = name
@@ -264,124 +268,6 @@ class Edition:
         #     cover_image.paste(back_print, (bp_pos_x, rec_y - bp_y))
         #     cover_image.paste(rotated_back_print, (rec_x - bp_y, int((rec_y / 2) - (bp_x / 2))))
         cover_image.save(f'{dst_p}/{dst_n}', quality='keep', dpi=(300, 300))
-
-    @staticmethod
-    def journal_decoding(file_list, dst_p):
-        file_list_len = len(file_list)
-        if not len(file_list) % 2 == 0:
-            return
-        count = 0
-        yield f'br{str(count).rjust(3, "0")}.jpg'
-        shutil.copy2(f'{file_list[-1][0]}/{file_list[-1][-1]}', f'{dst_p}/br{str(count).rjust(3, "0")}.jpg')
-        count += 1
-        for i in range((file_list_len-1) // 2):
-            uneven_spread = file_list[i]
-            even_spread = file_list[file_list_len-2-i]
-            with Image.open(f'{uneven_spread[0]}/{uneven_spread[1]}') as uneven_spread:
-                uneven_spread.load()
-            with Image.open(f'{even_spread[0]}/{even_spread[1]}') as even_spread:
-                even_spread.load()
-            uneven_spread_crop = uneven_spread.crop((0, 0, uneven_spread.width // 2, uneven_spread.height))
-            spread_to_save = even_spread.copy()
-            spread_to_save.paste(uneven_spread_crop)
-            yield f'br{str(count).rjust(3, "0")}.jpg'
-            spread_to_save.save(f'{dst_p}/br{str(count).rjust(3, "0")}.jpg', quality=100, dpi=(300, 300))
-            uneven_spread_crop.close()
-            count += 1
-            even_spread_crop = even_spread.crop((0, 0, even_spread.width // 2, even_spread.height))
-            spread_to_save = uneven_spread.copy()
-            spread_to_save.paste(even_spread_crop)
-            yield f'br{str(count).rjust(3, "0")}.jpg'
-            spread_to_save.save(f'{dst_p}/br{str(count).rjust(3, "0")}.jpg', quality=100, dpi=(300, 300))
-            even_spread_crop.close()
-            count += 1
-            even_spread.close()
-            uneven_spread.close()
-        yield f'br{str(count).rjust(3, "0")}.jpg'
-        msi = file_list_len // 2 - 1
-        shutil.copy2(f'{file_list[msi][0]}/{file_list[msi][-1]}', f'{dst_p}/br{str(count).rjust(3, "0")}.jpg')
-
-    @staticmethod
-    def album_decoding(file_list, dst_p, text, **kwargs):
-        pages_count = 1
-        white_image = Image.new('RGB', (2400, 2400), 'white')
-        top_white_image = white_image.copy()
-        draw_text = ImageDraw.Draw(top_white_image)
-        draw_text.text((235, 2125), text=text, fill="#9a9a9a", font=ImageFont.truetype("arial.ttf", 80))
-        top_white_image.save(f'{dst_p}/page{pages_count}.jpg', quality=100, dpi=(300, 300))
-        top_white_image.close()
-        overlap = Edition.mm_to_pixel(kwargs['dc_overlap'])
-        top_ind = Edition.mm_to_pixel(kwargs['dc_top_indent'])
-        left_ind = Edition.mm_to_pixel(kwargs['dc_left_indent'])
-        for path, page in file_list:
-            yield page
-            with Image.open(f'{path}/{page}') as spread_img:
-                spread_img.load()
-            l_side = spread_img.crop((0, 0, spread_img.width // 2 + overlap, spread_img.height))
-            r_side = spread_img.crop((spread_img.width // 2 - overlap, 0, spread_img.width, spread_img.height))
-            spread_img.close()
-            if left_ind > 0 or top_ind > 0:
-                new_l_side = Image.new('RGB', (l_side.width + left_ind, l_side.height + top_ind), 'white')
-                new_l_side.paste(l_side, (0, top_ind))
-                l_side.close()
-                l_side = new_l_side
-                new_r_side = Image.new('RGB', (r_side.width + left_ind, r_side.height + top_ind), 'white')
-                new_r_side.paste(r_side, (left_ind, top_ind))
-                r_side.close()
-                r_side = new_r_side
-            pages_count += 2
-            l_side.save(f'{dst_p}/page{pages_count - 1}.jpg', quality=100, dpi=(300, 300))
-            r_side.save(f'{dst_p}/page{pages_count}.jpg', quality=100, dpi=(300, 300))
-            l_side.close()
-            r_side.close()
-        white_image.save(f'{dst_p}/page{pages_count + 1}.jpg', quality=100, dpi=(300, 300))
-        white_image.close()
-
-    @staticmethod
-    def break_decoding(file_list, dst_p, text, **kwargs):
-        pages_list = []
-        white_image = Image.new('RGB', (2400, 2400), 'white')
-        draw_text = ImageDraw.Draw(white_image)
-        draw_text.text((235, 2125), text=text, fill="#9a9a9a", font=ImageFont.truetype("arial.ttf", 80))
-        pages_list.append(white_image)
-        overlap = Edition.mm_to_pixel(kwargs['dc_overlap'])
-        top_ind = Edition.mm_to_pixel(kwargs['dc_top_indent'])
-        left_ind = Edition.mm_to_pixel(kwargs['dc_left_indent'])
-        for path, page in file_list:
-            yield f'Creating objects {page}'
-            with Image.open(f'{path}/{page}') as spread_img:
-                spread_img.load()
-            l_crop = spread_img.crop((0, 0, spread_img.width // 2 + overlap, spread_img.height))
-            r_crop = spread_img.crop((spread_img.width // 2 - overlap, 0, spread_img.width, spread_img.height))
-            spread_img.close()
-            l_side = Image.new('RGB', (spread_img.width // 2 + left_ind + overlap, spread_img.height + top_ind), 'white')
-            r_side = l_side.copy()
-            l_side.paste(l_crop, (0, top_ind))
-            l_crop.close()
-            pages_list.append(l_side)
-            r_side.paste(r_crop, (left_ind, top_ind))
-            r_crop.close()
-            pages_list.append(r_side)
-        pages_list.append(Image.new('RGB', (2400, 2400), 'white'))
-        yield f'Saving decoded pages'
-        middle = len(pages_list) // 2
-        for i in range(middle):
-            fb_page = Image.new('RGB', (3780, 5398), 'white')
-            top_img, bottom_img = pages_list[i], pages_list[middle + i]
-            if i % 2 == 0:
-                fb_page.paste(top_img, (0, 0))
-                fb_page.paste(bottom_img, (0, 2763))
-            else:
-                fb_page.paste(top_img, (3780 - top_img.width, 0))
-                fb_page.paste(bottom_img, (3780 - top_img.width, 2763))
-            top_img.close()
-            bottom_img.close()
-            fb_page.save(f'{dst_p}/page{i + 1}.jpg', quality=100, dpi=(300, 300))
-            fb_page.close()
-
-    @staticmethod
-    def mm_to_pixel(value: int) -> int:
-        return int(value * 11.88)
 
 
 
@@ -511,6 +397,84 @@ class AlbumEdition(Edition):
                 for file in self.album_decoding(ex, new_path, text, **self.file_stg):
                     yield file
 
+    @staticmethod
+    def album_decoding(file_list, dst_p, text, **kwargs):
+        pages_count = 1
+        white_image = Image.new('RGB', (2400, 2400), 'white')
+        top_white_image = white_image.copy()
+        draw_text = ImageDraw.Draw(top_white_image)
+        draw_text.text((235, 2125), text=text, fill="#9a9a9a", font=ImageFont.truetype("arial.ttf", 80))
+        top_white_image.save(f'{dst_p}/page{pages_count}.jpg', quality=100, dpi=(300, 300))
+        top_white_image.close()
+        overlap = Edition.mm_to_pixel(kwargs['dc_overlap'])
+        top_ind = Edition.mm_to_pixel(kwargs['dc_top_indent'])
+        left_ind = Edition.mm_to_pixel(kwargs['dc_left_indent'])
+        for path, page in file_list:
+            yield page
+            with Image.open(f'{path}/{page}') as spread_img:
+                spread_img.load()
+            l_side = spread_img.crop((0, 0, spread_img.width // 2 + overlap, spread_img.height))
+            r_side = spread_img.crop((spread_img.width // 2 - overlap, 0, spread_img.width, spread_img.height))
+            spread_img.close()
+            if left_ind > 0 or top_ind > 0:
+                new_l_side = Image.new('RGB', (l_side.width + left_ind, l_side.height + top_ind), 'white')
+                new_l_side.paste(l_side, (0, top_ind))
+                l_side.close()
+                l_side = new_l_side
+                new_r_side = Image.new('RGB', (r_side.width + left_ind, r_side.height + top_ind), 'white')
+                new_r_side.paste(r_side, (left_ind, top_ind))
+                r_side.close()
+                r_side = new_r_side
+            pages_count += 2
+            l_side.save(f'{dst_p}/page{pages_count - 1}.jpg', quality=100, dpi=(300, 300))
+            r_side.save(f'{dst_p}/page{pages_count}.jpg', quality=100, dpi=(300, 300))
+            l_side.close()
+            r_side.close()
+        white_image.save(f'{dst_p}/page{pages_count + 1}.jpg', quality=100, dpi=(300, 300))
+        white_image.close()
+
+    @staticmethod
+    def break_decoding(file_list, dst_p, text, **kwargs):
+        pages_list = []
+        white_image = Image.new('RGB', (2400, 2400), 'white')
+        draw_text = ImageDraw.Draw(white_image)
+        draw_text.text((235, 2125), text=text, fill="#9a9a9a", font=ImageFont.truetype("arial.ttf", 80))
+        pages_list.append(white_image)
+        overlap = Edition.mm_to_pixel(kwargs['dc_overlap'])
+        top_ind = Edition.mm_to_pixel(kwargs['dc_top_indent'])
+        left_ind = Edition.mm_to_pixel(kwargs['dc_left_indent'])
+        for path, page in file_list:
+            yield f'Creating objects {page}'
+            with Image.open(f'{path}/{page}') as spread_img:
+                spread_img.load()
+            l_crop = spread_img.crop((0, 0, spread_img.width // 2 + overlap, spread_img.height))
+            r_crop = spread_img.crop((spread_img.width // 2 - overlap, 0, spread_img.width, spread_img.height))
+            spread_img.close()
+            l_side = Image.new('RGB', (spread_img.width // 2 + left_ind + overlap, spread_img.height + top_ind),
+                               'white')
+            r_side = l_side.copy()
+            l_side.paste(l_crop, (0, top_ind))
+            l_crop.close()
+            pages_list.append(l_side)
+            r_side.paste(r_crop, (left_ind, top_ind))
+            r_crop.close()
+            pages_list.append(r_side)
+        pages_list.append(Image.new('RGB', (2400, 2400), 'white'))
+        yield f'Saving decoded pages'
+        middle = len(pages_list) // 2
+        for i in range(middle):
+            fb_page = Image.new('RGB', (3780, 5398), 'white')
+            top_img, bottom_img = pages_list[i], pages_list[middle + i]
+            if i % 2 == 0:
+                fb_page.paste(top_img, (0, 0))
+                fb_page.paste(bottom_img, (0, 2763))
+            else:
+                fb_page.paste(top_img, (3780 - top_img.width, 0))
+                fb_page.paste(bottom_img, (3780 - top_img.width, 2763))
+            top_img.close()
+            bottom_img.close()
+            fb_page.save(f'{dst_p}/page{i + 1}.jpg', quality=100, dpi=(300, 300))
+            fb_page.close()
 
 
 class JournalEdition(Edition):
@@ -527,6 +491,42 @@ class JournalEdition(Edition):
         for ex in self.variables_list:
             for file in self.journal_decoding(ex, f'{self.path}/_TO_PRINT/{self.name}/{ex[0][0].split("/")[-1]}'):
                 yield file
+
+    @staticmethod
+    def journal_decoding(file_list, dst_p):
+        file_list_len = len(file_list)
+        if not len(file_list) % 2 == 0:
+            return
+        count = 0
+        yield f'br{str(count).rjust(3, "0")}.jpg'
+        shutil.copy2(f'{file_list[-1][0]}/{file_list[-1][-1]}', f'{dst_p}/br{str(count).rjust(3, "0")}.jpg')
+        count += 1
+        for i in range((file_list_len-1) // 2):
+            uneven_spread = file_list[i]
+            even_spread = file_list[file_list_len-2-i]
+            with Image.open(f'{uneven_spread[0]}/{uneven_spread[1]}') as uneven_spread:
+                uneven_spread.load()
+            with Image.open(f'{even_spread[0]}/{even_spread[1]}') as even_spread:
+                even_spread.load()
+            uneven_spread_crop = uneven_spread.crop((0, 0, uneven_spread.width // 2, uneven_spread.height))
+            spread_to_save = even_spread.copy()
+            spread_to_save.paste(uneven_spread_crop)
+            yield f'br{str(count).rjust(3, "0")}.jpg'
+            spread_to_save.save(f'{dst_p}/br{str(count).rjust(3, "0")}.jpg', quality=100, dpi=(300, 300))
+            uneven_spread_crop.close()
+            count += 1
+            even_spread_crop = even_spread.crop((0, 0, even_spread.width // 2, even_spread.height))
+            spread_to_save = uneven_spread.copy()
+            spread_to_save.paste(even_spread_crop)
+            yield f'br{str(count).rjust(3, "0")}.jpg'
+            spread_to_save.save(f'{dst_p}/br{str(count).rjust(3, "0")}.jpg', quality=100, dpi=(300, 300))
+            even_spread_crop.close()
+            count += 1
+            even_spread.close()
+            uneven_spread.close()
+        yield f'br{str(count).rjust(3, "0")}.jpg'
+        msi = file_list_len // 2 - 1
+        shutil.copy2(f'{file_list[msi][0]}/{file_list[msi][-1]}', f'{dst_p}/br{str(count).rjust(3, "0")}.jpg')
 
 
 class CanvasEdition(Edition):
