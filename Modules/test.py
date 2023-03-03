@@ -1,7 +1,13 @@
+class TEST:
+    def test_method(self):
+        var = 1
+        print('test')
 
 
+class TEST2(TEST):
+    def test_method(self):
+        super().test_method()
+        print(var)
 
-main_dct = {'1': 1, '2': {'21': 21, '22': 22}}
-children = main_dct['2']
-children.update({'23': 23})
-print(main_dct)
+
+TEST2().test_method()

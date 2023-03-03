@@ -154,12 +154,40 @@ class OrderSmartProcessor:
                 yield self.order_name, edition, file
 
 
+class Exemplar:
+    __slots__ = 'name', 'img_list', 'comp_list'
+
+    def __init__(self, name, img_list, comp_list):
+        self.name = name
+        self.img_list = img_list
+        self.comp_list = comp_list
+
+    def __len__(self):
+        return len(self.img_list) - 1
+
+    def get_cover(self):
+        return self.img_list[-1]
+
+    def get_pages(self):
+        return self.img_list[:-1]
+
+    def get_var_pages(self):
+        return tuple(self.img_list[i] for i in range(len(self.img_list) - 1) if self.comp_list[i] == 'v')
+
+
 class Edition:
-    __slots__ = 'path', 'name', 'index', 'file_stg', 'proc_stg', 'cover_list', 'constant_list', 'variables_list'
+    __slots__ = 'path', 'name', 'index', 'file_stg', 'proc_stg', 'cover_lst', 'const_lst', 'var_lst'
+    DIR_PAT = r'\d{3}(-\d{,3}_pcs)?'
+    VAR_IMG_PAT = r'(?:\d{3}_|cover)_\d{3}(-\d{,3}_pcs)?\.jpg'
+    CONST_IMG_PAT = r''
+    VAR_COV_PAT = r'cover_\d{3}(-\d{,3}_pcs)?\.jpg'
+    CONST_COV_PAT = r'cover_\d{,3}_pcs\.jpg'
+    VAR_P_PAT = r''
+    CONST_P_PAT = r'\d{3}_\d{,3}_pcs\.jpg'
 
     @staticmethod
     def mm_to_pixel(value: int) -> int:
-        return int(value * 11.88)
+        return int(value * 11.808)
 
     def __init__(self, path, name, index, file_stg, proc_stg=None):
         self.path = path
@@ -167,12 +195,17 @@ class Edition:
         self.index = index
         self.file_stg = file_stg
         self.proc_stg = proc_stg
-        self.cover_list = None
-        self.constant_list = None
-        self.variables_list = None
+        self.cover_lst = None
+        self.const_lst = None
+        self.var_lst = None
 
     def get_file_list(self):
-        pass
+        path = f'{self.path}/{self.name}'
+        var_img = tuple(x for x in self.__get_variables())
+        for ex_dir in (x for x in os.listdir(path) if re.fullmatch(self.DIR_PAT, x)):
+            img_list = tuple(x for x in os.listdir(f'{path}/{ex_dir}') if re.fullmatch(self.VAR_IMG_PAT, x))
+            comp_list = tuple('v' if x in var_img else 'c' for x in img_list)
+            yield Exemplar(ex_dir, img_list, comp_list)
 
     def get_file_len(self):
         return 0
@@ -183,56 +216,55 @@ class Edition:
     def processing_run(self):
         return []
 
-    def get_covers(self):
+    def __get_variables(self):
         path = f'{self.path}/{self.name}'
-        for catalog in os.listdir(path):
-            if catalog in ('Constant', 'Variable'):
-                for file in os.listdir(f'{path}/{catalog}'):
-                    if re.fullmatch(r'cover_(?:\d{3}|\d{,3}_pcs|\d{3}-\d{,3}_pcs)\.jpg', file):
-                        yield f'{path}/{catalog}', file
+        for var_dir in (x for x in os.listdir(path) if x == 'Variable'):
+            yield from (x for x in os.listdir(f'{path}/{var_dir}') if re.fullmatch(self.VAR_IMG_PAT, x))
 
-    def get_constant_pages(self):
+    def get_constant_img(self, pattern: str):
         path = f'{self.path}/{self.name}'
-        for catalog in os.listdir(path):
-            if catalog == 'Constant':
-                for file in os.listdir(f'{path}/{catalog}'):
-                    if re.fullmatch(r'\d{3}_\d{,3}_pcs\.jpg', file):
-                        yield f'{path}/{catalog}', file
+        for const_dir in (x for x in os.listdir(path) if x == 'Constant'):
+            yield from (x for x in os.listdir(f'{path}/{const_dir}') if re.fullmatch(pattern, x))
 
-    def get_variable_pages(self):
+    def get_book_file_list(self, ex_obj):
+        combination = self.file_stg['combination']
         path = f'{self.path}/{self.name}'
-        for catalog in os.listdir(path):
-            if catalog == 'Variable':
-                for file in os.listdir(f'{path}/{catalog}'):
-                    if re.fullmatch(r'\d{3}__\d{3}\.jpg', file):
-                        yield f'{path}/{catalog}', file
-
-    def get_ex_pages(self, covers_include=False):
-        path = f'{self.path}/{self.name}'
-        for catalog in os.listdir(path):
-            if re.fullmatch(r'\d{3}(-\d{,3}_pcs)?', catalog):
-                lst = []
-                for file in os.listdir(f'{path}/{catalog}'):
-                    if re.fullmatch(r'\d{3}__\d{3}(-\d{,3}_pcs)?\.jpg', file):
-                        lst.append((f'{path}/{catalog}', file))
-                    if covers_include and re.fullmatch(r'cover_\d{3}(-\d{,3}_pcs)?\.jpg', file):
-                        lst.append((f'{path}/{catalog}', file))
-                yield tuple(lst)
+        if combination == 'Копии' or combination is None:
+            ex = ex_obj[0]
+            ex_path, ex_len = f'{path}/{ex.name}', len(ex)
+            self.cover_lst = (ex_path, ex.get_cover(), ex_len),
+            self.var_lst = tuple((ex_path, img, ex_len) for img in ex.get_pages())
+        if combination in ('В_О', 'О_О', 'Индивидуально'):
+            self.const_lst = tuple((f'{path}/Constant', img) for img in self.get_constant_img(self.CONST_P_PAT))
+        if combination == 'В_О':
+            const_len = len(self.const_lst)
+            self.cover_lst = tuple((f'{path}/{ex.name}', ex.get_cover(), const_len) for ex in ex_obj)
+        if combination == 'О_О':
+            max_spn = max(len(ex) for ex in ex_obj)
+            self.var_lst = tuple((f'{path}/{ex.name}', img, len(ex)) for ex in ex_obj for img in ex.get_var_pages())
+            self.cover_lst = tuple((f'{path}/Constant', x, max_spn) for x in self.get_constant_img(self.CONST_COV_PAT))
+        if combination == 'Индивидуально':
+            self.var_lst = tuple((f'{path}/{ex.name}', img, len(ex)) for ex in ex_obj for img in ex.get_var_pages())
+            self.cover_lst = tuple((f'{path}/{ex.name}', ex.get_cover(), len(ex)) for ex in ex_obj)
 
     @staticmethod
     def cover_processing(src_p, src_n, dst_p, dst_n, **kwargs):
         with Image.open(f'{src_p}/{src_n}') as cover_image:
             cover_image.load()
-        draw = ImageDraw.Draw(cover_image)
-        rec_x = cover_image.width
-        rec_y = cover_image.height
-        print(kwargs)
+        draw = ImageDraw.Draw(cover_image)  # Инициализация объекта для рисования
+        rec_x, rec_y = cover_image.width, cover_image.height    # Получаем размер обложки
+        gl_color = kwargs.get('guideline_color', '#000000')     # Инициализация общих переменных
+        gl_size = kwargs.get('guideline_size', 4)
+        gl_spine = Edition.mm_to_pixel(kwargs.get('gl_value', 0))   # Сразу переводим в пиксели
+        gl_length = Edition.mm_to_pixel(kwargs.get('gl_length', 0))
         if kwargs.get('stroke', False):     # Прорисовка обводки
             draw.rectangle((0, 0, rec_x, rec_y), outline=kwargs['stroke_color'], width=kwargs['stroke_size'])
-        # # Направляющие для обычных книг
-        # gl_color = kwargs['gl_color'] if 'gl_color' in kwargs else '#000000'
-        # gl_size = kwargs['gl_size'] if 'gl_size' in kwargs else 4
-        # gl_spine = kwargs['gl_spine'] if 'gl_spine' in kwargs else 0
+        if kwargs.get('guideline', False) and kwargs.get('book_type', False) in ('Книга', 'Люкс'):  # направляющие
+            draw.line((gl_spine, 0, gl_spine, gl_length), fill=gl_color, width=gl_size)
+            draw.line((rec_x - gl_spine, 0, rec_x - gl_spine, gl_length), fill=gl_color, width=gl_size)
+            draw.line((gl_spine, rec_y, gl_spine, rec_y - gl_length), fill=gl_color, width=gl_size)
+            draw.line((rec_x - gl_spine, rec_y, rec_x - gl_spine, rec_y - gl_length), fill=gl_color, width=gl_size)
+
         # file_name = kwargs['file_name'] if 'file_name' in kwargs else '0.jpg'
         # if gl_spine > 0 and kwargs['luxe'] is False:
         #     draw.line((gl_spine, 0, gl_spine, 90), fill=gl_color, width=gl_size)
@@ -273,18 +305,16 @@ class Edition:
 
 class FotobookEdition(Edition):
     def get_file_list(self):
-        self.cover_list = tuple(self.get_covers())
-        self.constant_list = tuple(self.get_constant_pages())
-        self.variables_list = tuple(self.get_variable_pages())
+        self.get_book_file_list(tuple(super().get_file_list()))
 
     def get_file_len(self):
-        return len(self.cover_list) + len(self.constant_list) + len(self.variables_list)
+        return len(self.cover_lst) + len(self.const_lst) + len(self.var_lst)
 
     def get_new_dirs(self):
         lst = [f'{self.path}/_TO_PRINT/{self.name}/{self.file_stg["cover_canal"]}']
-        if self.constant_list:
+        if self.const_lst:
             lst.append(f'{self.path}/_TO_PRINT/{self.name}/{self.file_stg["page_canal"]}_Constant')
-        if self.variables_list:
+        if self.var_lst:
             lst.append(f'{self.path}/_TO_PRINT/{self.name}/{self.file_stg["page_canal"]}_Variable')
         return tuple(lst)
 
@@ -294,18 +324,18 @@ class FotobookEdition(Edition):
         option = {"б/у": 'bu', "с/у": 'cu', "с/у1.2": 'cu1_2'}[self.file_stg["book_option"]]
         book_type = self.file_stg['book_type']
         rename = self.proc_stg['rename']
-        for src_path, src_file in self.cover_list:
+        for src_path, src_file in self.cover_lst:
             yield src_file
             c_name = f'{self.index}{option}__{src_file}' if rename else src_file
             if book_type in ('Кожаная обложка', 'Планшет'):
                 shutil.copy2(f'{src_path}/{src_file}', f'{self.path}/_TO_PRINT/{self.name}/{cover_canal}/{c_name}')
             else:
                 self.cover_processing('src', 'p_dst', 'name', **self.file_stg, **self.proc_stg)
-        for src_path, src_file in self.constant_list:
+        for src_path, src_file in self.const_lst:
             yield src_file
             p_name = f'{self.index}{option}__{src_file}' if rename else src_file
             shutil.copy2(f'{src_path}/{src_file}', f'{self.path}/_TO_PRINT/{self.name}/{page_canal}_Constant/{p_name}')
-        for src_path, src_file in self.variables_list:
+        for src_path, src_file in self.var_lst:
             yield src_file
             p_name = f'{self.index}{option}__{src_file}' if rename else src_file
             shutil.copy2(f'{src_path}/{src_file}', f'{self.path}/_TO_PRINT/{self.name}/{page_canal}_Variable/{p_name}')
@@ -313,18 +343,16 @@ class FotobookEdition(Edition):
 
 class PolibookEdition(Edition):
     def get_file_list(self):
-        self.cover_list = tuple(self.get_covers())
-        self.constant_list = tuple(self.get_constant_pages())
-        self.variables_list = tuple(self.get_variable_pages())
+        self.get_book_file_list(tuple(super().get_file_list()))
 
     def get_file_len(self):
-        return len(self.cover_list) + len(self.constant_list) + len(self.variables_list)
+        return sum(len(lst) for lst in (self.cover_lst, self.const_lst, self.var_lst) if lst)
 
     def get_new_dirs(self):
         lst = [f'{self.path}/_TO_PRINT/{self.name}/Covers']
-        if self.constant_list:
+        if self.const_lst:
             lst.append(f'{self.path}/_TO_PRINT/{self.name}/Constant')
-        if self.variables_list:
+        if self.var_lst:
             lst.append(f'{self.path}/_TO_PRINT/{self.name}/Variable')
         return tuple(lst)
 
@@ -332,63 +360,69 @@ class PolibookEdition(Edition):
         option = {"б/у": 'бу', "с/у": 'су', "с/у1.2": 'су1_2'}[self.file_stg["book_option"]]
         book_type = self.file_stg['book_type']
         rename = self.proc_stg['rename']
-        for src_path, src_file in self.cover_list:
+        cover_path = f'{self.path}/_TO_PRINT/{self.name}/Covers'
+        for src_path, src_file, ex_len in self.cover_lst:
             yield src_file
-            c_name = f'{self.index}{option}__{src_file}' if rename else src_file
+            c_name = f'{self.index}_{src_file[:-4]}_{ex_len}{option}.jpg' if rename else src_file
             if book_type in ('Кожаная обложка', 'Планшет'):
-                shutil.copy2(f'{src_path}/{src_file}', f'{self.path}/_TO_PRINT/{self.name}/Covers/{c_name}')
+                shutil.copy2(f'{src_path}/{src_file}', f'{cover_path}/{c_name}')
             else:
-                self.cover_processing('src', 'p_dst', 'name', **self.file_stg, **self.proc_stg)
-        for src_path, src_file in self.constant_list:
-            yield src_file
-            p_name = f'{self.index}{option}__{src_file}' if rename else src_file
-            shutil.copy2(f'{src_path}/{src_file}', f'{self.path}/_TO_PRINT/{self.name}/Constant/{p_name}')
-        for src_path, src_file in self.variables_list:
-            yield src_file
-            p_name = f'{self.index}{option}__{src_file}' if rename else src_file
-            shutil.copy2(f'{src_path}/{src_file}', f'{self.path}/_TO_PRINT/{self.name}/Variable/{p_name}')
+                self.cover_processing(src_path, src_file, cover_path, c_name, **self.file_stg, **self.proc_stg)
+        if self.const_lst:
+            for src_path, src_file in self.const_lst:
+                yield src_file
+                p_name = f'{self.index}_{src_file[:-4]}_{option}.jpg' if rename else src_file
+                shutil.copy2(f'{src_path}/{src_file}', f'{self.path}/_TO_PRINT/{self.name}/Constant/{p_name}')
+        if self.var_lst:
+            for src_path, src_file, ex_len in self.var_lst:
+                yield src_file
+                p_name = f'{self.index}_{src_file[:-4]}_{ex_len}{option}.jpg' if rename else src_file
+                shutil.copy2(f'{src_path}/{src_file}', f'{self.path}/_TO_PRINT/{self.name}/Variable/{p_name}')
 
 
 class AlbumEdition(Edition):
     def get_file_list(self):
-        self.cover_list = tuple(self.get_covers())
-        if self.file_stg['combination'] == 'В_О':
-            self.variables_list = tuple(self.get_constant_pages()),
-            self.constant_list = self.variables_list[0][0][1].split('_')[1]
+        self.get_album_file_list(tuple(super().get_file_list()))
+
+    def get_album_file_list(self, ex_obj):
+        combination = self.file_stg['combination']
+        path = f'{self.path}/{self.name}'
+        if combination == 'О_О':
+            max_spn = max(len(ex) for ex in ex_obj)
+            self.cover_lst = tuple((f'{path}/Constant', x, max_spn) for x in self.get_constant_img(self.CONST_COV_PAT))
         else:
-            self.variables_list = tuple(self.get_ex_pages())
+            self.cover_lst = tuple((f'{path}/{ex.name}', ex.get_cover(), len(ex)) for ex in ex_obj)
+        if combination == 'В_О':
+            ex = ex_obj[0]
+            self.var_lst = tuple((f'{path}/{ex.name}', img) for img in ex.get_pages()),
+        else:
+            self.var_lst = tuple(tuple((f'{path}/{ex.name}', img) for img in ex.get_pages()) for ex in ex_obj)
 
     def get_file_len(self):
-        file_len = len(self.cover_list) + sum(len(x) for x in self.variables_list)
+        file_len = len(self.cover_lst) + sum(len(x) for x in self.var_lst)
         if self.file_stg['dc_break']:
-            file_len += len(self.variables_list)
+            file_len += len(self.var_lst)
         return file_len
 
     def get_new_dirs(self):
         cover_dir = f'{self.path}/_TO_PRINT/{self.name}/Covers',
-        lst = []
-        for ex in self.variables_list:
-            pages_len = f'{len(ex)}p_'
-            copies = f'-{self.constant_list}_pcs' if self.file_stg['combination'] == 'В_О' else ''
-            old_name = ex[0][0].split('/')[-1] if self.file_stg['combination'] != 'В_О' else '001'
-            lst.append(f'{self.path}/_TO_PRINT/{self.name}/{pages_len}{old_name}{copies}')
-        return cover_dir + tuple(lst)
+        lst = tuple(f'{self.path}/_TO_PRINT/{self.name}/{len(ex)}p_{ex[0][0].split("/")[-1]}' for ex in self.var_lst)
+        return cover_dir + lst
 
     def processing_run(self):
         rename, gl_need = self.proc_stg['rename'], self.proc_stg['guideline']
         cover_path = f'{self.path}/_TO_PRINT/{self.name}/Covers'
-        for src_path, src_file in self.cover_list:
+        for src_path, src_file, ex_len in self.cover_lst:
             yield src_file
-            c_name = f'{self.index}_{src_file}' if rename else src_file
-            if not gl_need:
-                shutil.copy2(f'{src_path}/{src_file}', f'{cover_path}/{c_name}')
-            else:
+            c_name = f'{self.index}_{src_file[:-4]}_{ex_len}p.jpg' if rename else src_file
+            if gl_need:
                 self.cover_processing(src_path, src_file, cover_path, c_name, **self.file_stg, **self.proc_stg)
-        for ex in self.variables_list:
+            else:
+                shutil.copy2(f'{src_path}/{src_file}', f'{cover_path}/{c_name}')
+        for ex in self.var_lst:
             pages_len = f'{len(ex)}p_'
-            copies = f'-{self.constant_list}_pcs' if self.file_stg['combination'] == 'В_О' else ''
-            old_name = ex[0][0].split('/')[-1] if self.file_stg['combination'] != 'В_О' else '001'
-            new_path = f'{self.path}/_TO_PRINT/{self.name}/{pages_len}{old_name}{copies}'
+            old_name = ex[0][0].split('/')[-1]
+            new_path = f'{self.path}/_TO_PRINT/{self.name}/{pages_len}{old_name}'
             text = f'{self.path[-6:]} - {self.name[:20]} - {old_name}'
             if self.file_stg['dc_break']:
                 for file in self.break_decoding(ex, new_path, text, **self.file_stg):
@@ -479,34 +513,37 @@ class AlbumEdition(Edition):
 
 class JournalEdition(Edition):
     def get_file_list(self):
-        self.variables_list = tuple(self.get_ex_pages(True))
+        self.var_lst = tuple(super().get_file_list())
 
     def get_file_len(self):
-        return sum(len(x) for x in self.variables_list)
+        return sum(len(ex) + 1 for ex in self.var_lst)
 
     def get_new_dirs(self):
-        return tuple(f'{self.path}/_TO_PRINT/{self.name}/{ex[0][0].split("/")[-1]}' for ex in self.variables_list)
+        return tuple(f'{self.path}/_TO_PRINT/{self.name}/{ex.name}' for ex in self.var_lst)
 
     def processing_run(self):
-        for ex in self.variables_list:
-            for file in self.journal_decoding(ex, f'{self.path}/_TO_PRINT/{self.name}/{ex[0][0].split("/")[-1]}'):
+        path = f'{self.path}/{self.name}'
+        for ex in self.var_lst:
+            ex_path = f'{path}/{ex.name}'
+            dst_path = f'{self.path}/_TO_PRINT/{self.name}/{ex.name}'
+            for file in self.journal_decoding(ex_path, ex.img_list, dst_path):
                 yield file
 
     @staticmethod
-    def journal_decoding(file_list, dst_p):
+    def journal_decoding(src_p, file_list, dst_p):
         file_list_len = len(file_list)
-        if not len(file_list) % 2 == 0:
+        if not file_list_len % 2 == 0:
             return
         count = 0
         yield f'br{str(count).rjust(3, "0")}.jpg'
-        shutil.copy2(f'{file_list[-1][0]}/{file_list[-1][-1]}', f'{dst_p}/br{str(count).rjust(3, "0")}.jpg')
+        shutil.copy2(f'{src_p}/{file_list[-1]}', f'{dst_p}/br{str(count).rjust(3, "0")}.jpg')
         count += 1
         for i in range((file_list_len-1) // 2):
             uneven_spread = file_list[i]
             even_spread = file_list[file_list_len-2-i]
-            with Image.open(f'{uneven_spread[0]}/{uneven_spread[1]}') as uneven_spread:
+            with Image.open(f'{src_p}/{uneven_spread}') as uneven_spread:
                 uneven_spread.load()
-            with Image.open(f'{even_spread[0]}/{even_spread[1]}') as even_spread:
+            with Image.open(f'{src_p}/{even_spread}') as even_spread:
                 even_spread.load()
             uneven_spread_crop = uneven_spread.crop((0, 0, uneven_spread.width // 2, uneven_spread.height))
             spread_to_save = even_spread.copy()
@@ -526,25 +563,26 @@ class JournalEdition(Edition):
             uneven_spread.close()
         yield f'br{str(count).rjust(3, "0")}.jpg'
         msi = file_list_len // 2 - 1
-        shutil.copy2(f'{file_list[msi][0]}/{file_list[msi][-1]}', f'{dst_p}/br{str(count).rjust(3, "0")}.jpg')
+        shutil.copy2(f'{src_p}/{file_list[msi]}', f'{dst_p}/br{str(count).rjust(3, "0")}.jpg')
 
 
 class CanvasEdition(Edition):
 
     def get_file_list(self):
-        self.cover_list = []
-        for path, cover in self.get_covers():
+        self.cover_lst = tuple(self.get_canvas_covers(super().get_file_list()))
+
+    def get_canvas_covers(self, ex_obj):
+        for ex in ex_obj:
+            path = f'{self.path}/{self.name}/{ex.name}'
+            cover = ex.get_cover()
             if re.fullmatch(r'cover_\d{3}\.jpg', cover):
-                self.cover_list.append((path, cover))
-            if re.fullmatch(r'cover_\d{,3}_pcs\.jpg', cover):
-                for mult in range(int(cover.split('_')[1])):
-                    self.cover_list.append((path, cover))
+                yield path, cover
             if re.fullmatch(r'cover_\d{3}-\d{,3}_pcs\.jpg', cover):
                 for mult in range(int(re.split(r'[-_]', cover)[2])):
-                    self.cover_list.append((path, cover))
+                    yield path, cover
 
     def get_file_len(self):
-        return len(self.cover_list)
+        return len(self.cover_lst)
 
     def get_new_dirs(self):
         return f'{self.path}/_TO_PRINT',
@@ -554,7 +592,7 @@ class CanvasEdition(Edition):
         to_print_len = sum(1 for x in os.listdir(f'{self.path}/_TO_PRINT') if re.search(canvas_pattern, x))
         kwargs = {'stroke': True, 'stroke_size': 355, 'stroke_color': '#ffffff'}
         canvas_format = self.file_stg["book_format"]
-        for ind, value in enumerate(self.cover_list):
+        for ind, value in enumerate(self.cover_lst):
             path, file = value
             yield file
             count = ind + to_print_len
