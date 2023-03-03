@@ -112,10 +112,11 @@ class OrderBuckup:
 
 
 class OrderSmartProcessor:
-    __slots__ = 'object_list', 'order_name'
+    __slots__ = 'object_list', 'order_name', 'path'
 
     def __init__(self, order_dict):
         self.order_name = order_dict['NAME']
+        self.path = order_dict["PATH"]
         self.object_list = self.get_obj_list(order_dict)
 
     @staticmethod
@@ -148,10 +149,16 @@ class OrderSmartProcessor:
             os.makedirs(path, exist_ok=True)
 
     def processing_run(self):
+        self.__mrk_deleting()
         for obj in self.object_list:
             edition = obj.name
             for file in obj.processing_run():
                 yield self.order_name, edition, file
+
+    def __mrk_deleting(self):
+        for element in os.listdir(f'{self.path}/{self.order_name}/_TO_PRINT'):
+            if re.fullmatch(r'\d{,3}\.mrk', element):
+                os.remove(f'{self.path}/{self.order_name}/_TO_PRINT/{element}')
 
 
 class Exemplar:
@@ -176,7 +183,7 @@ class Exemplar:
 
 
 class Edition:
-    __slots__ = 'path', 'name', 'index', 'file_stg', 'proc_stg', 'cover_lst', 'const_lst', 'var_lst'
+    __slots__ = 'path', 'name', 'index', 'file_stg', 'proc_stg', 'cover_lst', 'const_lst', 'var_lst', 'reserved'
     DIR_PAT = r'\d{3}(-\d{,3}_pcs)?'
     VAR_IMG_PAT = r'(?:\d{3}_|cover)_\d{3}(-\d{,3}_pcs)?\.jpg'
     CONST_IMG_PAT = r''
@@ -198,6 +205,7 @@ class Edition:
         self.cover_lst = None
         self.const_lst = None
         self.var_lst = None
+        self.reserved = None
 
     def get_file_list(self):
         path = f'{self.path}/{self.name}'
@@ -299,10 +307,12 @@ class FotobookEdition(Edition):
         return tuple(lst)
 
     def processing_run(self):
+        self.reserved = {}
         option = {"б/у": 'bu', "с/у": 'cu', "с/у1.2": 'cu1_2'}[self.file_stg["book_option"]]
         book_type = self.file_stg['book_type']
         rename = self.proc_stg['rename']
-        cov_path = f'{self.path}/_TO_PRINT/{self.name}/{self.file_stg["cover_canal"]}'
+        cover_canal, page_canal = self.file_stg["cover_canal"], self.file_stg["page_canal"]
+        cov_path = f'{self.path}/_TO_PRINT/{self.name}/{cover_canal}'
         order_name = self.path.split('/')[-1]
         for src_path, src_file, ex_len in self.cover_lst:
             yield src_file
@@ -314,18 +324,62 @@ class FotobookEdition(Edition):
                 if self.proc_stg.get('add backprint', False):
                     bp = {'bp_text': f'{order_name} - {c_name}'}
                 self.cover_processing(src_path, src_file, cov_path, c_name, **self.file_stg, **self.proc_stg, **bp)
+                self.reserved.setdefault(cover_canal, []).append((f'{self.name}/{cover_canal}', c_name))
         if self.const_lst:
-            const_path = f'{self.path}/_TO_PRINT/{self.name}/{self.file_stg["page_canal"]}_Constant'
+            const_path = f'{self.path}/_TO_PRINT/{self.name}/{page_canal}_Constant'
             for src_path, src_file in self.const_lst:
                 yield src_file
                 p_name = f'{self.index}_{src_file[:-4]}_{option}.jpg' if rename else src_file
                 shutil.copy2(f'{src_path}/{src_file}', f'{const_path}/{p_name}')
+                self.reserved.setdefault(page_canal, []).append((page_canal, f'{self.name}/{page_canal}_Constant', p_name))
         if self.var_lst:
-            var_path = f'{self.path}/_TO_PRINT/{self.name}/{self.file_stg["page_canal"]}_Variable'
+            var_path = f'{self.path}/_TO_PRINT/{self.name}/{page_canal}_Variable'
             for src_path, src_file, ex_len in self.var_lst:
                 yield src_file
                 p_name = f'{self.index}_{src_file[:-4]}_{ex_len}{option}.jpg' if rename else src_file
                 shutil.copy2(f'{src_path}/{src_file}', f'{var_path}/{p_name}')
+                self.reserved.setdefault(page_canal, []).append((page_canal, f'{self.name}/{page_canal}_Variable', p_name))
+        # if self.proc_stg['generate .mrk']:
+        #     self.create_mrk()
+
+    def create_mrk(self):
+        file_list = os.listdir(f'{self.path}/_TO_PRINT')
+        cover_canal = self.file_stg['cover_canal']
+        if cover_canal not in ('POLI', 'ORAJET'):
+            with open(f'{self.path}/_TO_PRINT/{cover_canal}.mrk', 'a') as file:
+                if f'{cover_canal}.mrk' not in file_list:
+                    file.writelines(x + '\n' for x in self.get_mrk_header())
+        self.get_mrk_file_list()
+
+    @staticmethod
+    def get_mrk_header():
+        header = ('[HDR]', 'GEN REV = 01.00', 'GEN CRT = "NORITSU KOKI" -01.00', 'GEN DTM = 1899:12:30:00:00:00',
+                  'USR NAM = ""', 'USR TEL = ""', 'VUQ RGN = BGN', 'VUQ VNM = "NORITSU KOKI" -ATR "QSSPrint"',
+                  'VUQ VER = 01.00', 'GEN INP = "OTHER"', 'VUQ RGN = END')
+        return header
+
+    @staticmethod
+    def get_mrk_body(num, qty, path, name, order_name, edition):
+        body = ('', '[JOB]', f'PRT PID = {num}', 'PRT TYP=STD', f'PRT QTY = {qty}', 'IMG FMT = EXIF2 -J',
+                f'<IMG SRC = "./{path}">', f'IMG FLD = {name}', 'VUQ RGN = BGN',
+                'VUQ VNM = "NORITSU KOKI" -ATR "QSSPrint"', 'VUQ VER = 01.00',
+                f'PRT CVP1 = 1 -STR "{order_name}  {edition}"',
+                f'PRT CVP2 = 1 -STR "{name}  {num}  www.fotoknigioptom.ru"', 'VUQ RGN = END')
+        return body
+
+    def get_mrk_file_list(self):
+        order_name = self.path.split('/')[-1]
+        print(order_name)
+        for canal, lst in self.reserved.items():
+            for i, val in enumerate(lst, 1):
+                rel_path, img = val
+                if re.fullmatch(r'(?:cover|\d{3}_)_\d{3}\.jpg', img):
+                    pass
+                    # yield self.get_mrk_body(i, 1, rel_path, img, order_name, self.index)
+                if re.fullmatch(r'(?:cover|\d{3}_)_\d{3}-\d{,3}_pcs\.jpg', img):
+                    print(img)
+
+
 
 
 class PolibookEdition(Edition):
