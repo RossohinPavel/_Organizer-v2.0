@@ -17,7 +17,8 @@ class StickerInfo:
         info = (lib['short_name'],
                 lib['book_format'] if lib['short_name'] not in ("кМикс", "пМикс", "Дуо", "Дуо гор", "Трио") else '',
                 counts[2], lib.get('book_option', ''), lib.get('lamination', ''),
-                f'-- {counts[3]}' if counts[3] is not None else '')
+                f'-- {counts[3]}' if counts[3] is not None else '',
+                '\nкож кор' if lib.get('book_type', False) == 'Кожаный корешок' else '')
         return 'body', ' '.join(name for name in info if name)
 
     def main(self) -> str:

@@ -259,46 +259,26 @@ class Edition:
         gl_length = Edition.mm_to_pixel(kwargs.get('gl_length', 0))
         if kwargs.get('stroke', False):     # Прорисовка обводки
             draw.rectangle((0, 0, rec_x, rec_y), outline=kwargs['stroke_color'], width=kwargs['stroke_size'])
-        if kwargs.get('guideline', False) and kwargs.get('book_type', False) in ('Книга', 'Люкс'):  # направляющие
+        if kwargs.get('guideline', False) and kwargs.get('book_type', False) in ('Книга', 'Люкс'):  # Направляющие
             draw.line((gl_spine, 0, gl_spine, gl_length), fill=gl_color, width=gl_size)
             draw.line((rec_x - gl_spine, 0, rec_x - gl_spine, gl_length), fill=gl_color, width=gl_size)
             draw.line((gl_spine, rec_y, gl_spine, rec_y - gl_length), fill=gl_color, width=gl_size)
             draw.line((rec_x - gl_spine, rec_y, rec_x - gl_spine, rec_y - gl_length), fill=gl_color, width=gl_size)
-
-        # file_name = kwargs['file_name'] if 'file_name' in kwargs else '0.jpg'
-        # if gl_spine > 0 and kwargs['luxe'] is False:
-        #     draw.line((gl_spine, 0, gl_spine, 90), fill=gl_color, width=gl_size)
-        #     draw.line((rec_x - gl_spine, 0, rec_x - gl_spine, 90), fill=gl_color, width=gl_size)
-        #     draw.line((gl_spine, rec_y, gl_spine, rec_y - 90), fill=gl_color, width=gl_size)
-        #     draw.line((rec_x - gl_spine, rec_y, rec_x - gl_spine, rec_y - 90), fill=gl_color, width=gl_size)
-        # # Направляющие для Люкс книг
-        # if gl_spine > 0 and kwargs['luxe'] is True:
-        #     draw.line((gl_spine, 0, gl_spine, rec_y), fill=gl_color, width=gl_size)
-        #     draw.line((gl_spine + 590, 0, gl_spine + 590, 60), fill=gl_color, width=gl_size)
-        #     draw.line((rec_x - gl_spine - 590, 0, rec_x - gl_spine - 590, 60), fill=gl_color, width=gl_size)
-        #     draw.line((gl_spine + 590, rec_y, gl_spine + 590, rec_y - 60), fill=gl_color, width=gl_size)
-        #     draw.line((rec_x - gl_spine - 590, rec_y, rec_x - gl_spine - 590, rec_y - 60), fill=gl_color, width=gl_size)
-        #     draw.line((rec_x - gl_spine, 0, rec_x - gl_spine, rec_y), fill=gl_color, width=gl_size)
-        # # Бек принт
-        # if 'back_print' in kwargs:
-        #     # Рисуем задник для бекпринта
-        #     new_name = kwargs['back_print']
-        #     back_print = Image.new('RGB', (len(new_name) * 21, 50), 'white')
-        #     # Определяем объект для текста
-        #     draw_text = ImageDraw.Draw(back_print)
-        #     # Получаем шрифт
-        #     font = ImageFont.truetype("Data\\Settings\\Roboto-Regular.ttf", size=40)
-        #     # Рисуем текст на заднике
-        #     draw_text.text((20, 0), text=new_name, font=font, fill="black")
-        #     # Поворачиваем задник
-        #     rotated_back_print = back_print.rotate(90, expand=True)
-        #     # Получаем размеры бекпринта
-        #     bp_x = back_print.width
-        #     bp_y = back_print.height
-        #     # Вставляем бэкпринт на исходное изображение
-        #     bp_pos_x = rec_x - kwargs['gl_spine'] + 10 if 'gl_spine' in kwargs else int(rec_x / 2) + 10
-        #     cover_image.paste(back_print, (bp_pos_x, rec_y - bp_y))
-        #     cover_image.paste(rotated_back_print, (rec_x - bp_y, int((rec_y / 2) - (bp_x / 2))))
+        if kwargs.get('guideline', False) and kwargs.get('book_type', False) == 'Люкс':     # Направляющие для Люкс
+            draw.line((gl_spine - 590, 0, gl_spine - 590, rec_y), fill=gl_color, width=gl_size)
+            draw.line((rec_x - gl_spine + 590, 0, rec_x - gl_spine + 590, rec_y), fill=gl_color, width=gl_size)
+        if kwargs.get('guideline', False) and kwargs.get('book_type', False) == 'Кожаный корешок':
+            draw.line((rec_x // 2 - 1, 0, rec_x // 2 - 1, rec_y), fill=gl_color, width=gl_size)
+        if kwargs.get('add backprint', False):
+            new_name = kwargs['bp_text']
+            back_print = Image.new('RGB', (len(new_name) * 21, 50), 'white')  # Рисуем задник для бекпринта
+            draw_text = ImageDraw.Draw(back_print)  # Определяем объект для текста
+            draw_text.text((20, 0), text=new_name, font=ImageFont.truetype("arial.ttf", 40), fill="black")   # Текст
+            rotated_back_print = back_print.rotate(90, expand=True)     # Поворачиваем задник
+            bp_x, bp_y = back_print.width, back_print.height    # Получаем размеры бекпринта
+            bp_pos_x = rec_x - gl_spine # Вставляем бэкпринт на исходное изображение
+            cover_image.paste(back_print, (bp_pos_x, rec_y - bp_y))
+            cover_image.paste(rotated_back_print, (rec_x - bp_y, int((rec_y / 2) - (bp_x / 2))))
         cover_image.save(f'{dst_p}/{dst_n}', quality='keep', dpi=(300, 300))
 
 
@@ -308,7 +288,7 @@ class FotobookEdition(Edition):
         self.get_book_file_list(tuple(super().get_file_list()))
 
     def get_file_len(self):
-        return len(self.cover_lst) + len(self.const_lst) + len(self.var_lst)
+        return sum(len(lst) for lst in (self.cover_lst, self.const_lst, self.var_lst) if lst)
 
     def get_new_dirs(self):
         lst = [f'{self.path}/_TO_PRINT/{self.name}/{self.file_stg["cover_canal"]}']
@@ -319,26 +299,33 @@ class FotobookEdition(Edition):
         return tuple(lst)
 
     def processing_run(self):
-        print(self.proc_stg)
-        cover_canal, page_canal = self.file_stg["cover_canal"], self.file_stg["page_canal"]
         option = {"б/у": 'bu', "с/у": 'cu', "с/у1.2": 'cu1_2'}[self.file_stg["book_option"]]
         book_type = self.file_stg['book_type']
         rename = self.proc_stg['rename']
-        for src_path, src_file in self.cover_lst:
+        cov_path = f'{self.path}/_TO_PRINT/{self.name}/{self.file_stg["cover_canal"]}'
+        order_name = self.path.split('/')[-1]
+        for src_path, src_file, ex_len in self.cover_lst:
             yield src_file
-            c_name = f'{self.index}{option}__{src_file}' if rename else src_file
+            c_name = f'{self.index}_{src_file[:-4]}_{ex_len}{option}.jpg' if rename else src_file
             if book_type in ('Кожаная обложка', 'Планшет'):
-                shutil.copy2(f'{src_path}/{src_file}', f'{self.path}/_TO_PRINT/{self.name}/{cover_canal}/{c_name}')
+                shutil.copy2(f'{src_path}/{src_file}', f'{cov_path}/{c_name}')
             else:
-                self.cover_processing('src', 'p_dst', 'name', **self.file_stg, **self.proc_stg)
-        for src_path, src_file in self.const_lst:
-            yield src_file
-            p_name = f'{self.index}{option}__{src_file}' if rename else src_file
-            shutil.copy2(f'{src_path}/{src_file}', f'{self.path}/_TO_PRINT/{self.name}/{page_canal}_Constant/{p_name}')
-        for src_path, src_file in self.var_lst:
-            yield src_file
-            p_name = f'{self.index}{option}__{src_file}' if rename else src_file
-            shutil.copy2(f'{src_path}/{src_file}', f'{self.path}/_TO_PRINT/{self.name}/{page_canal}_Variable/{p_name}')
+                bp = {}
+                if self.proc_stg.get('add backprint', False):
+                    bp = {'bp_text': f'{order_name} - {c_name}'}
+                self.cover_processing(src_path, src_file, cov_path, c_name, **self.file_stg, **self.proc_stg, **bp)
+        if self.const_lst:
+            const_path = f'{self.path}/_TO_PRINT/{self.name}/{self.file_stg["page_canal"]}_Constant'
+            for src_path, src_file in self.const_lst:
+                yield src_file
+                p_name = f'{self.index}_{src_file[:-4]}_{option}.jpg' if rename else src_file
+                shutil.copy2(f'{src_path}/{src_file}', f'{const_path}/{p_name}')
+        if self.var_lst:
+            var_path = f'{self.path}/_TO_PRINT/{self.name}/{self.file_stg["page_canal"]}_Variable'
+            for src_path, src_file, ex_len in self.var_lst:
+                yield src_file
+                p_name = f'{self.index}_{src_file[:-4]}_{ex_len}{option}.jpg' if rename else src_file
+                shutil.copy2(f'{src_path}/{src_file}', f'{var_path}/{p_name}')
 
 
 class PolibookEdition(Edition):
