@@ -107,34 +107,34 @@ class OrderBuckup:
         contents_len = len(self.contents)
         for i, v in enumerate(self.contents):
             for f_src, f_dst, f_name in self.file_list[i]:
-                yield self.order_name, f'{contents_len}/{i+1} -- {v}', f_name
+                yield self.order_name, f'{contents_len}/{i + 1} -- {v}', f_name
                 shutil.copy2(f'{src}/{f_src}/{f_name}', f'{src}/_TO_PRINT/{f_dst}/{f_name}')
 
 
 class OrderSmartProcessor:
-    __slots__ = 'object_list', 'order_name', 'path'
+    __slots__ = 'object_list', 'order_name', 'path', 'mrk_creator'
 
     def __init__(self, order_dict):
         self.order_name = order_dict['NAME']
-        self.path = order_dict["PATH"]
+        self.path = f'{order_dict["PATH"]}/{order_dict["NAME"]}'
+        self.mrk_creator = MRK_Creator(self.order_name, self.path)
         self.object_list = self.get_obj_list(order_dict)
 
-    @staticmethod
-    def get_obj_list(order_dict: dict) -> list:
+    def get_obj_list(self, order_dict: dict) -> list:
         lst = []
-        path = f'{order_dict["PATH"]}/{order_dict["NAME"]}'
         for ind, val in enumerate(order_dict['CONTENTS'].items(), 1):
             content, value = val
             if value['category'] == 'photobook':
-                lst.append(FotobookEdition(path, content, ind, value, order_dict['PROC_STG']['photobook']))
+                lst.append(FotobookEdition(self.path, content, ind, value, order_dict['PROC_STG']['photobook'],
+                                           self.mrk_creator))
             if value['category'] == 'layflat':
-                lst.append(PolibookEdition(path, content, ind, value, order_dict['PROC_STG']['layflat']))
+                lst.append(PolibookEdition(self.path, content, ind, value, order_dict['PROC_STG']['layflat']))
             if value['category'] == 'album':
-                lst.append(AlbumEdition(path, content, ind, value, order_dict['PROC_STG']['album']))
+                lst.append(AlbumEdition(self.path, content, ind, value, order_dict['PROC_STG']['album']))
             if value['category'] == 'journal':
-                lst.append(JournalEdition(path, content, ind, value))
+                lst.append(JournalEdition(self.path, content, ind, value))
             if value['category'] == 'photocanvas':
-                lst.append(CanvasEdition(path, content, ind, value))
+                lst.append(CanvasEdition(self.path, content, ind, value))
         return lst
 
     def get_file_list(self):
@@ -149,16 +149,13 @@ class OrderSmartProcessor:
             os.makedirs(path, exist_ok=True)
 
     def processing_run(self):
-        self.__mrk_deleting()
         for obj in self.object_list:
             edition = obj.name
             for file in obj.processing_run():
                 yield self.order_name, edition, file
+        if self.mrk_creator.img_list:
+            self.mrk_creator.create_mrk()
 
-    def __mrk_deleting(self):
-        for element in os.listdir(f'{self.path}/{self.order_name}/_TO_PRINT'):
-            if re.fullmatch(r'\d{,3}\.mrk', element):
-                os.remove(f'{self.path}/{self.order_name}/_TO_PRINT/{element}')
 
 
 class Exemplar:
@@ -183,7 +180,7 @@ class Exemplar:
 
 
 class Edition:
-    __slots__ = 'path', 'name', 'index', 'file_stg', 'proc_stg', 'cover_lst', 'const_lst', 'var_lst', 'reserved'
+    __slots__ = 'path', 'name', 'index', 'file_stg', 'proc_stg', 'cover_lst', 'const_lst', 'var_lst'
     DIR_PAT = r'\d{3}(-\d{,3}_pcs)?'
     VAR_IMG_PAT = r'(?:\d{3}_|cover)_\d{3}(-\d{,3}_pcs)?\.jpg'
     CONST_IMG_PAT = r''
@@ -194,6 +191,7 @@ class Edition:
 
     @staticmethod
     def mm_to_pixel(value: int) -> int:
+        """Возвращает значение в пикселях при разрешении в 300 dpi"""
         return int(value * 11.808)
 
     def __init__(self, path, name, index, file_stg, proc_stg=None):
@@ -205,7 +203,6 @@ class Edition:
         self.cover_lst = None
         self.const_lst = None
         self.var_lst = None
-        # self.reserved = None
 
     def get_file_list(self):
         path = f'{self.path}/{self.name}'
@@ -260,19 +257,19 @@ class Edition:
         with Image.open(f'{src_p}/{src_n}') as cover_image:
             cover_image.load()
         draw = ImageDraw.Draw(cover_image)  # Инициализация объекта для рисования
-        rec_x, rec_y = cover_image.width, cover_image.height    # Получаем размер обложки
-        gl_color = kwargs.get('guideline_color', '#000000')     # Инициализация общих переменных
+        rec_x, rec_y = cover_image.width, cover_image.height  # Получаем размер обложки
+        gl_color = kwargs.get('guideline_color', '#000000')  # Инициализация общих переменных
         gl_size = kwargs.get('guideline_size', 4)
-        gl_spine = Edition.mm_to_pixel(kwargs.get('gl_value', 0))   # Сразу переводим в пиксели
+        gl_spine = Edition.mm_to_pixel(kwargs.get('gl_value', 0))  # Сразу переводим в пиксели
         gl_length = Edition.mm_to_pixel(kwargs.get('gl_length', 0))
-        if kwargs.get('stroke', False):     # Прорисовка обводки
+        if kwargs.get('stroke', False):  # Прорисовка обводки
             draw.rectangle((0, 0, rec_x, rec_y), outline=kwargs['stroke_color'], width=kwargs['stroke_size'])
         if kwargs.get('guideline', False) and kwargs.get('book_type', False) in ('Книга', 'Люкс'):  # Направляющие
             draw.line((gl_spine, 0, gl_spine, gl_length), fill=gl_color, width=gl_size)
             draw.line((rec_x - gl_spine, 0, rec_x - gl_spine, gl_length), fill=gl_color, width=gl_size)
             draw.line((gl_spine, rec_y, gl_spine, rec_y - gl_length), fill=gl_color, width=gl_size)
             draw.line((rec_x - gl_spine, rec_y, rec_x - gl_spine, rec_y - gl_length), fill=gl_color, width=gl_size)
-        if kwargs.get('guideline', False) and kwargs.get('book_type', False) == 'Люкс':     # Направляющие для Люкс
+        if kwargs.get('guideline', False) and kwargs.get('book_type', False) == 'Люкс':  # Направляющие для Люкс
             draw.line((gl_spine - 590, 0, gl_spine - 590, rec_y), fill=gl_color, width=gl_size)
             draw.line((rec_x - gl_spine + 590, 0, rec_x - gl_spine + 590, rec_y), fill=gl_color, width=gl_size)
         if kwargs.get('guideline', False) and kwargs.get('book_type', False) == 'Кожаный корешок':
@@ -281,17 +278,22 @@ class Edition:
             new_name = kwargs['bp_text']
             back_print = Image.new('RGB', (len(new_name) * 21, 50), 'white')  # Рисуем задник для бекпринта
             draw_text = ImageDraw.Draw(back_print)  # Определяем объект для текста
-            draw_text.text((20, 0), text=new_name, font=ImageFont.truetype("arial.ttf", 40), fill="black")   # Текст
-            rotated_back_print = back_print.rotate(90, expand=True)     # Поворачиваем задник
-            bp_x, bp_y = back_print.width, back_print.height    # Получаем размеры бекпринта
-            bp_pos_x = rec_x - gl_spine # Вставляем бэкпринт на исходное изображение
+            draw_text.text((20, 0), text=new_name, font=ImageFont.truetype("arial.ttf", 40), fill="black")  # Текст
+            rotated_back_print = back_print.rotate(90, expand=True)  # Поворачиваем задник
+            bp_x, bp_y = back_print.width, back_print.height  # Получаем размеры бекпринта
+            bp_pos_x = rec_x - gl_spine  # Вставляем бэкпринт на исходное изображение
             cover_image.paste(back_print, (bp_pos_x, rec_y - bp_y))
             cover_image.paste(rotated_back_print, (rec_x - bp_y, int((rec_y / 2) - (bp_x / 2))))
         cover_image.save(f'{dst_p}/{dst_n}', quality='keep', dpi=(300, 300))
 
 
-
 class FotobookEdition(Edition):
+    __slots__ = 'mrk_creator',
+
+    def __init__(self, path, name, index, file_stg, proc_stg, mrk_creator):
+        super().__init__(path, name, index, file_stg, proc_stg)
+        self.mrk_creator = mrk_creator
+
     def get_file_list(self):
         self.get_book_file_list(tuple(super().get_file_list()))
 
@@ -307,13 +309,11 @@ class FotobookEdition(Edition):
         return tuple(lst)
 
     def processing_run(self):
-        # self.reserved = {}
-        option = {"б/у": 'bu', "с/у": 'cu', "с/у1.2": 'cu1_2'}[self.file_stg["book_option"]]
-        book_type = self.file_stg['book_type']
-        rename = self.proc_stg['rename']
-        cover_canal, page_canal = self.file_stg["cover_canal"], self.file_stg["page_canal"]
-        cov_path = f'{self.path}/_TO_PRINT/{self.name}/{cover_canal}'
         order_name = self.path.split('/')[-1]
+        cover_canal, page_canal = self.file_stg["cover_canal"], self.file_stg["page_canal"]
+        book_type, rename, mrk_gen = self.file_stg['book_type'], self.proc_stg['rename'], self.proc_stg['generate .mrk']
+        option = {"б/у": 'bu', "с/у": 'cu', "с/у1.2": 'cu1_2'}[self.file_stg["book_option"]]
+        cov_path = f'{self.path}/_TO_PRINT/{self.name}/{cover_canal}'
         for src_path, src_file, ex_len in self.cover_lst:
             yield src_file
             c_name = f'{self.index}_{src_file[:-4]}_{ex_len}{option}.jpg' if rename else src_file
@@ -324,62 +324,24 @@ class FotobookEdition(Edition):
                 if self.proc_stg.get('add backprint', False):
                     bp = {'bp_text': f'{order_name} - {c_name}'}
                 self.cover_processing(src_path, src_file, cov_path, c_name, **self.file_stg, **self.proc_stg, **bp)
-                # self.reserved.setdefault(cover_canal, []).append((f'{self.name}/{cover_canal}', c_name))
+            if mrk_gen:
+                self.mrk_creator.add_img(cover_canal, cov_path, c_name)
         if self.const_lst:
             const_path = f'{self.path}/_TO_PRINT/{self.name}/{page_canal}_Constant'
             for src_path, src_file in self.const_lst:
                 yield src_file
                 p_name = f'{self.index}_{src_file[:-4]}_{option}.jpg' if rename else src_file
                 shutil.copy2(f'{src_path}/{src_file}', f'{const_path}/{p_name}')
-                # self.reserved.setdefault(page_canal, []).append((page_canal, f'{self.name}/{page_canal}_Constant', p_name))
+                if mrk_gen:
+                    self.mrk_creator.add_img(page_canal, const_path, p_name)
         if self.var_lst:
             var_path = f'{self.path}/_TO_PRINT/{self.name}/{page_canal}_Variable'
             for src_path, src_file, ex_len in self.var_lst:
                 yield src_file
                 p_name = f'{self.index}_{src_file[:-4]}_{ex_len}{option}.jpg' if rename else src_file
                 shutil.copy2(f'{src_path}/{src_file}', f'{var_path}/{p_name}')
-                # self.reserved.setdefault(page_canal, []).append((page_canal, f'{self.name}/{page_canal}_Variable', p_name))
-        # if self.proc_stg['generate .mrk']:
-        #     self.create_mrk()
-
-    # def create_mrk(self):
-    #     file_list = os.listdir(f'{self.path}/_TO_PRINT')
-    #     cover_canal = self.file_stg['cover_canal']
-    #     if cover_canal not in ('POLI', 'ORAJET'):
-    #         with open(f'{self.path}/_TO_PRINT/{cover_canal}.mrk', 'a') as file:
-    #             if f'{cover_canal}.mrk' not in file_list:
-    #                 file.writelines(x + '\n' for x in self.get_mrk_header())
-    #     self.get_mrk_file_list()
-    #
-    # @staticmethod
-    # def get_mrk_header():
-    #     header = ('[HDR]', 'GEN REV = 01.00', 'GEN CRT = "NORITSU KOKI" -01.00', 'GEN DTM = 1899:12:30:00:00:00',
-    #               'USR NAM = ""', 'USR TEL = ""', 'VUQ RGN = BGN', 'VUQ VNM = "NORITSU KOKI" -ATR "QSSPrint"',
-    #               'VUQ VER = 01.00', 'GEN INP = "OTHER"', 'VUQ RGN = END')
-    #     return header
-    #
-    # @staticmethod
-    # def get_mrk_body(num, qty, path, name, order_name, edition):
-    #     body = ('', '[JOB]', f'PRT PID = {num}', 'PRT TYP=STD', f'PRT QTY = {qty}', 'IMG FMT = EXIF2 -J',
-    #             f'<IMG SRC = "./{path}">', f'IMG FLD = {name}', 'VUQ RGN = BGN',
-    #             'VUQ VNM = "NORITSU KOKI" -ATR "QSSPrint"', 'VUQ VER = 01.00',
-    #             f'PRT CVP1 = 1 -STR "{order_name}  {edition}"',
-    #             f'PRT CVP2 = 1 -STR "{name}  {num}  www.fotoknigioptom.ru"', 'VUQ RGN = END')
-    #     return body
-    #
-    # def get_mrk_file_list(self):
-    #     order_name = self.path.split('/')[-1]
-    #     print(order_name)
-    #     for canal, lst in self.reserved.items():
-    #         for i, val in enumerate(lst, 1):
-    #             rel_path, img = val
-    #             if re.fullmatch(r'(?:cover|\d{3}_)_\d{3}\.jpg', img):
-    #                 pass
-    #                 # yield self.get_mrk_body(i, 1, rel_path, img, order_name, self.index)
-    #             if re.fullmatch(r'(?:cover|\d{3}_)_\d{3}-\d{,3}_pcs\.jpg', img):
-    #                 print(img)
-
-
+                if mrk_gen:
+                    self.mrk_creator.add_img(page_canal, var_path, p_name)
 
 
 class PolibookEdition(Edition):
@@ -579,9 +541,9 @@ class JournalEdition(Edition):
         yield f'br{str(count).rjust(3, "0")}.jpg'
         shutil.copy2(f'{src_p}/{file_list[-1]}', f'{dst_p}/br{str(count).rjust(3, "0")}.jpg')
         count += 1
-        for i in range((file_list_len-1) // 2):
+        for i in range((file_list_len - 1) // 2):
             uneven_spread = file_list[i]
-            even_spread = file_list[file_list_len-2-i]
+            even_spread = file_list[file_list_len - 2 - i]
             with Image.open(f'{src_p}/{uneven_spread}') as uneven_spread:
                 uneven_spread.load()
             with Image.open(f'{src_p}/{even_spread}') as even_spread:
@@ -640,3 +602,78 @@ class CanvasEdition(Edition):
             count = ' ' + str(count) if count > 0 else ''
             name = f'{self.path[-6:]} холст {canvas_format} натяжка в короб{count}.jpg'
             self.cover_processing(path, file, f'{self.path}/_TO_PRINT', name, **kwargs)
+
+
+class MRK_Creator:
+    __slots__ = 'order_name', 'path', 'img_list'
+    TRANSLIT_DCT = {'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D', 'Е': 'E', 'Ё': 'YO', 'Ж': 'ZH', 'З': 'Z', 'И': 'I',
+                    'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M', 'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T',
+                    'У': 'U', 'Ф': 'F', 'Х': 'H', 'Ц': 'C', 'Ч': 'CH', 'Ш': 'SH', 'Щ': 'SH', 'Ъ': '', 'Ы': 'I', 'Ь': '',
+                    'Э': 'Y', 'Ю': 'YU', 'Я': 'YA',
+                    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo', 'ж': 'zh', 'з': 'z', 'и': 'i',
+                    'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't',
+                    'у': 'u', 'ф': 'f', 'х': 'h', 'ц': 'c', 'ч': 'ch', 'ш': 'sh', 'щ': 'sh', 'ъ': '', 'ы': 'i', 'ь': '',
+                    'э': 'Y', 'ю': 'yu', 'я': 'ya'}
+
+    def __init__(self, order_name, path):
+        self.order_name = order_name
+        self.path = path
+        self.img_list = {}
+
+    @staticmethod
+    def __get_mrk_header():
+        return ['[HDR]', 'GEN REV = 01.00', 'GEN CRT = "NORITSU KOKI" -01.00', 'GEN DTM = 1899:12:30:00:00:00',
+                'USR NAM = ""', 'USR TEL = ""', 'VUQ RGN = BGN', 'VUQ VNM = "NORITSU KOKI" -ATR "QSSPrint"',
+                'VUQ VER = 01.00', 'GEN INP = "OTHER"', 'VUQ RGN = END']
+
+    @staticmethod
+    def __get_mrk_body(num, qty, path, name, order_name, edition):
+        return ['', '[JOB]', f'PRT PID = {num}', 'PRT TYP=STD', f'PRT QTY = {qty}', 'IMG FMT = EXIF2 -J',
+                f'<IMG SRC = "./{path}">', f'IMG FLD = {name}', 'VUQ RGN = BGN',
+                'VUQ VNM = "NORITSU KOKI" -ATR "QSSPrint"', 'VUQ VER = 01.00',
+                f'PRT CVP1 = 1 -STR "{order_name}  {edition}"',
+                f'PRT CVP2 = 1 -STR "{name}  www.fotoknigioptom.ru"', 'VUQ RGN = END']
+
+    def __mrk_deleting(self):
+        for element in os.listdir(f'{self.path}/_TO_PRINT'):
+            if re.fullmatch(r'\d{,3}\.mrk', element):
+                os.remove(f'{self.path}/_TO_PRINT/{element}')
+
+    def add_img(self, canal, path, name):
+        if canal in ('POLI', 'ORAJET'):
+            return
+        mult = 1
+        is_copy = re.findall(r'\d{,3}_pcs', name)
+        if is_copy:
+            mult = int(is_copy[0].split('_')[0])
+        self.img_list.setdefault(canal, []).append((path, name, mult))
+
+    def create_mrk(self):
+        self.__mrk_deleting()
+        for canal, values in self.img_list.items():
+            mrk = self.__get_mrk_header()
+            for i, img in enumerate(values, 1):
+                path, name, qty = img
+                num = f'{i}'.rjust(3, '0')
+                edition = ''.join(self.__get_edition_eng_name(path))
+                path = self.__get_rel_path(path, name)
+                mrk.extend(self.__get_mrk_body(num, qty, path, name, self.order_name, edition))
+            self.__write_mrk(canal, mrk)
+
+    def __get_rel_path(self, path, name):
+        rel_path = path.split(f'{self.path}/_TO_PRINT/')[-1]
+        return f'{rel_path}/{name}'
+
+    @classmethod
+    def __get_edition_eng_name(cls, path):
+        edition_name = path.split('/')[-2]
+        for char in edition_name:
+            if char.isalpha():
+                yield cls.TRANSLIT_DCT.get(char, '')
+            else:
+                yield char
+
+    def __write_mrk(self, canal, mrk):
+        gen = (x + '\n' for x in mrk)
+        with open(f'{self.path}/_TO_PRINT/{canal}.mrk', 'w') as file:
+            file.writelines(gen)
