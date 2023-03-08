@@ -293,6 +293,7 @@ class FotobookEdition(Edition):
     def __init__(self, path, name, index, file_stg, proc_stg, mrk_creator):
         super().__init__(path, name, index, file_stg, proc_stg)
         self.mrk_creator = mrk_creator
+        self.mrk_creator.add_edition_name(name)
 
     def get_file_list(self):
         self.get_book_file_list(tuple(super().get_file_list()))
@@ -605,20 +606,22 @@ class CanvasEdition(Edition):
 
 
 class MRK_Creator:
-    __slots__ = 'order_name', 'path', 'img_list'
-    TRANSLIT_DCT = {'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D', 'Е': 'E', 'Ё': 'YO', 'Ж': 'ZH', 'З': 'Z', 'И': 'I',
-                    'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M', 'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T',
-                    'У': 'U', 'Ф': 'F', 'Х': 'H', 'Ц': 'C', 'Ч': 'CH', 'Ш': 'SH', 'Щ': 'SH', 'Ъ': '', 'Ы': 'I', 'Ь': '',
-                    'Э': 'Y', 'Ю': 'YU', 'Я': 'YA',
-                    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo', 'ж': 'zh', 'з': 'z', 'и': 'i',
-                    'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't',
-                    'у': 'u', 'ф': 'f', 'х': 'h', 'ц': 'c', 'ч': 'ch', 'ш': 'sh', 'щ': 'sh', 'ъ': '', 'ы': 'i', 'ь': '',
-                    'э': 'Y', 'ю': 'yu', 'я': 'ya'}
+    __slots__ = 'order_name', 'path', 'img_list', 'names_hash'
+    TRANSLIT_DCT = {'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D', 'Е': 'E', 'Ё': 'YO', 'Ж': 'ZH', 'З': 'Z',
+                    'И': 'I', 'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M', 'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S',
+                    'Т': 'T', 'У': 'U', 'Ф': 'F', 'Х': 'H', 'Ц': 'C', 'Ч': 'CH', 'Ш': 'SH', 'Щ': 'SH', 'Ъ': '',
+                    'Ы': 'I', 'Ь': '', 'Э': 'Y', 'Ю': 'YU', 'Я': 'YA',
+                    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo', 'ж': 'zh', 'з': 'z',
+                    'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's',
+                    'т': 't', 'у': 'u', 'ф': 'f', 'х': 'h', 'ц': 'c', 'ч': 'ch', 'ш': 'sh', 'щ': 'sh', 'ъ': '',
+                    'ы': 'i', 'ь': '', 'э': 'Y', 'ю': 'yu', 'я': 'ya'}
+    ENG_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefhhijklmnopqrstuvwxyz'
 
     def __init__(self, order_name, path):
         self.order_name = order_name
         self.path = path
         self.img_list = {}
+        self.names_hash = {}
 
     @staticmethod
     def __get_mrk_header():
@@ -639,6 +642,9 @@ class MRK_Creator:
             if re.fullmatch(r'\d{,3}\.mrk', element):
                 os.remove(f'{self.path}/_TO_PRINT/{element}')
 
+    def add_edition_name(self, name):
+        self.names_hash.update({name: ''.join(self.__get_edition_eng_name(name))})
+
     def add_img(self, canal, path, name):
         if canal in ('POLI', 'ORAJET'):
             return
@@ -655,7 +661,7 @@ class MRK_Creator:
             for i, img in enumerate(values, 1):
                 path, name, qty = img
                 num = f'{i}'.rjust(3, '0')
-                edition = ''.join(self.__get_edition_eng_name(path))
+                edition = self.names_hash.get(path.split('/')[-2])
                 path = self.__get_rel_path(path, name)
                 mrk.extend(self.__get_mrk_body(num, qty, path, name, self.order_name, edition))
             self.__write_mrk(canal, mrk)
@@ -665,11 +671,13 @@ class MRK_Creator:
         return f'{rel_path}/{name}'
 
     @classmethod
-    def __get_edition_eng_name(cls, path):
-        edition_name = path.split('/')[-2]
-        for char in edition_name:
+    def __get_edition_eng_name(cls, name):
+        for char in name:
             if char.isalpha():
-                yield cls.TRANSLIT_DCT.get(char, '')
+                if char in cls.ENG_ALPHABET:
+                    yield char
+                else:
+                    yield cls.TRANSLIT_DCT.get(char, '')
             else:
                 yield char
 
