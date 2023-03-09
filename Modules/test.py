@@ -4,4 +4,4 @@
 string = 'test_test'
 
 
-print(string.split('test'))
+print(string[:5])

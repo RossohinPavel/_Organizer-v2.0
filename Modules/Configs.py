@@ -41,3 +41,14 @@ def read_pcl_log_for_processing():
     for logfile in reversed(os.listdir('Logs')):
         with open(f'Logs/{logfile}', 'rb') as file:
             yield pickle.load(file)
+
+
+def get_logs_list() -> tuple:
+    return tuple(os.listdir(f'Logs/'))
+
+
+def read_chosen_pcl_log(date1, date2):
+    for log in os.listdir('Logs'):
+        if date1 <= log[:-4] <= date2:
+            with open(f'Logs/{log}', 'rb') as file:
+                yield pickle.load(file)

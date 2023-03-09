@@ -68,6 +68,8 @@ class Window(tk.Tk):
 
         def init_delete_from_lib_window(): DeleteFromLibWindow(self)
 
+        def init_information_window(): InformationWindow(self)
+
         settings_menu = tk.Menu(tearoff=0)
         settings_menu.add_command(label="Общие настройки", command=init_settings_window)
 
@@ -76,9 +78,13 @@ class Window(tk.Tk):
         library_menu.add_command(label='Изменить продукт', command=init_change_lib_window)
         library_menu.add_command(label='Удалить продукт', command=init_delete_from_lib_window)
 
+        information_menu = tk.Menu(tearoff=0)
+        information_menu.add_command(label='Информация по продуктам', command=init_information_window)
+
         main_menu = tk.Menu()
         main_menu.add_cascade(label="Настройки", menu=settings_menu)
         main_menu.add_cascade(label='Библиотека', menu=library_menu)
+        main_menu.add_cascade(label='Информация', menu=information_menu)
         self.config(menu=main_menu)
 
 
@@ -1033,3 +1039,69 @@ class BackUpWindow(ProcessingWindow):
             if chosen_order:
                 self.order_exist['CONTENTS'] = {chosen_order: self.order_exist['CONTENTS'][chosen_order]}
         self.order_exist.update({'TYPE': self.order_type_radio.get()})
+
+
+class InformationWindow(ChildWindow):
+    def __init__(self, parent_root):
+        super().__init__(parent_root)
+        self.main_settings()
+        self.dates_list = tuple(x[:-4] for x in Conf.get_logs_list())
+        self.combo1 = None
+        self.combo2 = None
+        self.tree = None
+        self.show_main_frame()
+        self.to_parent_center()
+
+    def main_settings(self):
+        self.title('Информация по продуктам')
+        self.resizable(False, False)
+
+    def show_main_frame(self):
+        label = ttk.Label(self, text='Укажите период для подсчета')
+        label.pack()
+        self.dates_ask_frame()
+        self.tree = ttk.Treeview(self, show='tree', height=20)
+        self.tree.pack(expand=1, fill=tk.BOTH, padx=2)
+        export_btn = tk.Button(self, text='Экспортировать', **self.style)
+        export_btn.pack(side=tk.LEFT, padx=4, pady=4)
+        close_btn = tk.Button(self, text='Закрыть', **self.style, command=self.destroy)
+        close_btn.pack(side=tk.RIGHT, padx=4, pady=4)
+
+    def dates_ask_frame(self):
+        frame = tk.Frame(self)
+        label1 = ttk.Label(frame, text='С:')
+        label1.grid(row=0, column=0)
+        self.combo1 = ttk.Combobox(frame, state='readonly', values=self.dates_list)
+        self.combo1.grid(row=0, column=1)
+        label2 = ttk.Label(frame, text='По:')
+        label2.grid(row=0, column=2)
+        self.combo2 = ttk.Combobox(frame, state='readonly', values=self.dates_list)
+        self.combo2.grid(row=0, column=3)
+        init_btn = tk.Button(frame, text='Посчитать', **self.style, command=self.init_counter)
+        init_btn.grid(row=0, column=4, padx=10)
+        frame.pack(pady=4, padx=2)
+
+    def clear_tree(self):
+        for i in self.tree.get_children(''):
+            self.tree.delete(i)
+
+    def init_counter(self):
+        date1, date2 = self.combo1.get(), self.combo2.get()
+        if not date1 or not date2:
+            return
+        self.combo1.set('')
+        self.combo2.set('')
+        counter_obj = Inf.ProductInfo(Conf.read_chosen_pcl_log(*sorted((date1, date2))), self.parent_root.O_LIBRARY)
+        books, photos, undetected = counter_obj.get_info()
+        print(books, photos, undetected)
+        self.clear_tree()
+        if books:
+            pass
+        if photos:
+            self.tree.insert('', tk.END, iid=3, text='Химическая фотопечать')
+            for string in sorted(f'{k}: {v}шт' for k, v in photos.items()):
+                self.tree.insert(3, index=tk.END, text=string)
+        if undetected:
+            self.tree.insert('', tk.END, iid=4, text='Нераспознанные тиражи')
+            for string in sorted(f'{k}: {v}шт' for k, v in undetected.items()):
+                self.tree.insert(4, index=tk.END, text=string)
