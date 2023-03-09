@@ -1093,15 +1093,86 @@ class InformationWindow(ChildWindow):
         self.combo2.set('')
         counter_obj = Inf.ProductInfo(Conf.read_chosen_pcl_log(*sorted((date1, date2))), self.parent_root.O_LIBRARY)
         books, photos, undetected = counter_obj.get_info()
-        print(books, photos, undetected)
         self.clear_tree()
         if books:
-            pass
+            self.__init_category(books)
+            self.__init_sub_category(books)
+            self.__init_product(books)
         if photos:
-            self.tree.insert('', tk.END, iid=3, text='Химическая фотопечать')
-            for string in sorted(f'{k}: {v}шт' for k, v in photos.items()):
-                self.tree.insert(3, index=tk.END, text=string)
-        if undetected:
-            self.tree.insert('', tk.END, iid=4, text='Нераспознанные тиражи')
-            for string in sorted(f'{k}: {v}шт' for k, v in undetected.items()):
+            self.tree.insert('', tk.END, iid=4, text='Химическая фотопечать')
+            for string in sorted(f'{k} -- {v}шт' for k, v in photos.items()):
                 self.tree.insert(4, index=tk.END, text=string)
+        if undetected:
+            self.tree.insert('', tk.END, iid=5, text='Нераспознанные тиражи')
+            for string in sorted(f'{k} -- {v}шт' for k, v in undetected.items()):
+                self.tree.insert(5, index=tk.END, text=string)
+
+    def __init_category(self, book_lst):
+        premium, edition, mat_lst = False, False, True
+        for product in book_lst:
+            if product['category'] == 'Премиум':
+                premium = True
+            if product['category'] == 'Тираж':
+                edition = True
+        if premium:
+            self.tree.insert('', tk.END, iid=1, text='Премиум')
+        if edition:
+            self.tree.insert('', tk.END, iid=2, text='Тиражи')
+        self.tree.insert('', tk.END, iid=3, text='Сводный список материалов')
+
+    def __init_sub_category(self, book_lst):
+        premium = {'Книги': 0, 'Люксы': 0, 'Кожаные обложки': 0, 'FlexBind': 0, 'Холсты': 0, 'Остальное': 0}
+        edition = {'Книги': 0, 'Планшеты': 0, 'Альбомы': 0, 'Дуо и Трио': 0,  'Остальное': 0}
+        for product in book_lst:
+            if product['category'] == 'Премиум':
+                premium[product['sub_cat']] += product['pr_count']
+            if product['category'] == 'Тираж':
+                edition[product['sub_cat']] += product['pr_count']
+        for ind, value in enumerate(premium.items()):
+            sub, counter = value
+            if counter > 0:
+                self.tree.insert(1, iid=int(f'1{ind}'), index=tk.END, text=f'{sub} -- {counter}')
+        for ind, value in enumerate(edition.items()):
+            sub, counter = value
+            if counter > 0:
+                self.tree.insert(2, iid=int(f'2{ind}'), index=tk.END, text=f'{sub} -- {counter}')
+
+    def __init_product(self, book_lst):
+        premium_ind = ('Книги', 'Люксы', 'Кожаные обложки', 'FlexBind', 'Холсты', 'Остальное')
+        edition_ind = ('Книги', 'Планшеты', 'Альбомы', 'Дуо и Трио', 'Остальное')
+        premium_lst = {}
+        edition_lst = {}
+        main_mat_lst = {}
+        for product in book_lst:
+            if product['category'] == 'Премиум':
+                premium_lst.setdefault(product['pr_name'], {'ind': 0, 'count': 0, 'mat_lst': {}})
+                premium_lst[product['pr_name']]['ind'] = int(f'1{premium_ind.index(product["sub_cat"])}')
+                premium_lst[product['pr_name']]['count'] += product['pr_count']
+                for k, v in product['mat_lst'].items():
+                    premium_lst[product['pr_name']]['mat_lst'].setdefault(k, 0)
+                    premium_lst[product['pr_name']]['mat_lst'][k] += v
+                    main_mat_lst.setdefault(k, 0)
+                    main_mat_lst[k] += v
+            if product['category'] == 'Тираж':
+                edition_lst.setdefault(product['pr_name'], {'ind': 0, 'count': 0, 'mat_lst': {}})
+                edition_lst[product['pr_name']]['ind'] = int(f'2{edition_ind.index(product["sub_cat"])}')
+                edition_lst[product['pr_name']]['count'] += product['pr_count']
+                for k, v in product['mat_lst'].items():
+                    edition_lst[product['pr_name']]['mat_lst'].setdefault(k, 0)
+                    edition_lst[product['pr_name']]['mat_lst'][k] += v
+                    main_mat_lst.setdefault(k, 0)
+                    main_mat_lst[k] += v
+        for i, v in enumerate(sorted(premium_lst.items())):
+            name, values = v
+            ind = int(f'{values["ind"]}{i}')
+            self.tree.insert(values['ind'], iid=ind, index=tk.END, text=f'{name} -- {values["count"]}')
+            for x, y in sorted(values['mat_lst'].items()):
+                self.tree.insert(ind, index=tk.END, text=f'{x} -- {y}')
+        for i, v in enumerate(sorted(edition_lst.items())):
+            name, values = v
+            ind = int(f'{values["ind"]}{i}')
+            self.tree.insert(values['ind'], iid=ind, index=tk.END, text=f'{name} -- {values["count"]}')
+            for x, y in sorted(values['mat_lst'].items()):
+                self.tree.insert(ind, index=tk.END, text=f'{x} -- {y}')
+        for k, v in sorted(main_mat_lst.items(), key=lambda x: x[1], reverse=True):
+            self.tree.insert(3, index=tk.END, text=f'{k} -- {v}')

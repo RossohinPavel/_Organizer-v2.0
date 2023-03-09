@@ -71,7 +71,8 @@ class ProductInfo:
             if lib_record['category'] == 'photocanvas':
                 self.__create_photocanvas_record(counters, p_name, lib_record)
         if lib_record['segment'] == 'Тираж':
-            pass
+            if lib_record['category'] == 'album':
+                self.__create_album_edition_record(counters, p_name, lib_record)
 
     def __create_record(self, category, sub_cat, pr_name, pr_count, mat_lst):
         rec = {'category': category, 'sub_cat': sub_cat, 'pr_name': pr_name, 'pr_count': pr_count, 'mat_lst': mat_lst}
@@ -80,4 +81,10 @@ class ProductInfo:
     def __create_photocanvas_record(self, counters, p_name, lib_record):
         x, y = map(lambda q: (int(q) + 10) / 100, lib_record['book_format'][:5].split('x'))
         mat_dct = {lib_record['cover_print_mat']: round(x * y * counters[0], 4)}
-        self.__create_record('Премиум', 'Остальное', p_name, counters[0], mat_dct)
+        self.__create_record('Премиум', 'Холсты', p_name, counters[0], mat_dct)
+
+    def __create_album_edition_record(self, counters, p_name, lib_record):
+        mat_dct = {lib_record['cover_print_mat']: counters[0],
+                   lib_record['page_print_mat']: counters[1] + counters[0],
+                   f'Переплетный картон {lib_record["cover_carton"]}': counters[0]}
+        self.__create_record('Тираж', 'Альбомы', p_name, counters[0], mat_dct)
