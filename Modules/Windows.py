@@ -457,9 +457,9 @@ class LibraryWindow(ChildWindow):
         frame = tk.Frame(self, width=500, height=50)
         label = tk.Label(frame, text='Выберите продукт')
         label.place(x=200, y=1)
-        self.names_combobox = ttk.Combobox(frame, state="readonly", width=40)
+        self.names_combobox = ttk.Combobox(frame, state="readonly", width=79)
         self.names_combobox.bind('<<ComboboxSelected>>', cb_bind_func)
-        self.names_combobox.place(x=130, y=25)
+        self.names_combobox.place(x=2, y=25)
         separator = tk.Canvas(frame, width=496, height=1, bg='black')
         separator.place(x=0, y=46)
         frame.pack()
@@ -617,7 +617,7 @@ class ChangeLibWindow(LibraryWindow):
     def category_event(self, event):
         self.names_combobox.set('')
         category = Lib.Product.CATEGORY[Lib.Product.RUS_NAMES.index(self.category_combobox.get())]
-        names = tuple(k for k, v in self.parent_root.O_LIBRARY.items() if v['category'] == category)
+        names = sorted(k for k, v in self.parent_root.O_LIBRARY.items() if v['category'] == category)
         self.names_combobox.config(values=names)
         self.product_menus_frame_clearing()
 
@@ -653,7 +653,7 @@ class DeleteFromLibWindow(LibraryWindow):
     def category_event(self, event=None):
         self.names_combobox.set('')
         category = Lib.Product.CATEGORY[Lib.Product.RUS_NAMES.index(self.category_combobox.get())]
-        names = tuple(k for k, v in self.parent_root.O_LIBRARY.items() if v['category'] == category)
+        names = sorted(k for k, v in self.parent_root.O_LIBRARY.items() if v['category'] == category)
         self.names_combobox.config(values=names)
 
     def del_button(self):
@@ -1158,6 +1158,7 @@ class InformationWindow(ChildWindow):
                 edition_lst[product['pr_name']]['ind'] = int(f'2{edition_ind.index(product["sub_cat"])}')
                 edition_lst[product['pr_name']]['count'] += product['pr_count']
                 for k, v in product['mat_lst'].items():
+                    print(k, v)
                     edition_lst[product['pr_name']]['mat_lst'].setdefault(k, 0)
                     edition_lst[product['pr_name']]['mat_lst'][k] += v
                     main_mat_lst.setdefault(k, 0)
