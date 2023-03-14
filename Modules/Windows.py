@@ -1060,8 +1060,13 @@ class InformationWindow(ChildWindow):
         label = ttk.Label(self, text='Укажите период для подсчета')
         label.pack()
         self.dates_ask_frame()
-        self.tree = ttk.Treeview(self, show='tree', height=20)
-        self.tree.pack(expand=1, fill=tk.BOTH, padx=2)
+        frame = tk.Frame(self)
+        frame.pack(expand=1, fill=tk.BOTH)
+        self.tree = ttk.Treeview(frame, show='tree', height=20)
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=1, padx=2)
+        scrollbar = ttk.Scrollbar(master=frame, orient=tk.VERTICAL, command=self.tree.yview)
+        self.tree.config(yscroll=scrollbar.set)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         export_btn = tk.Button(self, text='Экспортировать', **self.style)
         export_btn.pack(side=tk.LEFT, padx=4, pady=4)
         close_btn = tk.Button(self, text='Закрыть', **self.style, command=self.destroy)
@@ -1158,7 +1163,6 @@ class InformationWindow(ChildWindow):
                 edition_lst[product['pr_name']]['ind'] = int(f'2{edition_ind.index(product["sub_cat"])}')
                 edition_lst[product['pr_name']]['count'] += product['pr_count']
                 for k, v in product['mat_lst'].items():
-                    print(k, v)
                     edition_lst[product['pr_name']]['mat_lst'].setdefault(k, 0)
                     edition_lst[product['pr_name']]['mat_lst'][k] += v
                     main_mat_lst.setdefault(k, 0)

@@ -1,5 +1,7 @@
-import pickle
+import math
+
+page_counter = 15
+cover_counter = 1
 
 
-with open ('../Logs/2023-03-12.pcl', 'rb') as file:
-    print(pickle.load(file))
+print(math.ceil((page_counter * 2 + cover_counter * 2) / 4))
